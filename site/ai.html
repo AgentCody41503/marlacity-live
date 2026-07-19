@@ -86,6 +86,7 @@
 <nav id="perspective">
   <a href="world.html">&#128100; Human Perspective</a>
   <span class="active">&#129302; AI Perspective</span>
+  <a href="storybook.html">&#127912; Storybook</a>
 </nav>
 
 <div id="title">
@@ -611,9 +612,12 @@ canvas.addEventListener('wheel', e => {
 }, { passive:true });
 
 const tip = document.getElementById('tip');
-function nearestCitizen(x, y, r) {
+function nearestCitizen(x, y, pad) {
+  /* hit radius tracks the citizen's actual on-screen size: up close a
+     walker is ~90px tall and a fixed radius only covered their feet */
   let best = null, bestD = 1e9;
   for (const c of citizens) {
+    const r = Math.max(24, 1.3 * cam.f / (c.sz || 1e9)) + pad;
     const d = Math.hypot(x - c.sx, y - c.sy);
     if (d < r && d < bestD) { best = c; bestD = d; }
   }
@@ -631,14 +635,14 @@ function showTip(c, x, y, hold) {
 /* hovering a walker names them; the pointer says they're clickable */
 canvas.addEventListener('pointermove', e => {
   if (dragging) return;
-  const c = nearestCitizen(e.clientX, e.clientY, 26);
+  const c = nearestCitizen(e.clientX, e.clientY, 2);
   canvas.style.cursor = c ? 'pointer' : '';
   if (c) { showTip(c, e.clientX, e.clientY, 0); tip._hover = true; }
   else if (tip._hover) { tip.style.display = 'none'; tip._hover = false; }
 });
 canvas.addEventListener('click', e => {
   if (moved > 6) return;
-  const best = nearestCitizen(e.clientX, e.clientY, 32);
+  const best = nearestCitizen(e.clientX, e.clientY, 10);
   if (best) {
     showTip(best, e.clientX, e.clientY, 2600);
     tip._hover = false;
@@ -1013,7 +1017,7 @@ function frame(ms) {
       }
     } else retarget(c);
     const q = project(V(c.x, terrainH(c.x,c.z)+1, c.z));
-    if (q) { c.sx = q.x; c.sy = q.y; }
+    if (q) { c.sx = q.x; c.sy = q.y; c.sz = q.z; }
     c.talking = false;
   }
   for (let i=0;i<citizens.length;i++) for (let j=i+1;j<citizens.length;j++) {
@@ -1027,7 +1031,7 @@ requestAnimationFrame(frame);
 </script>
 <script>
 /* Postcard edition — snapshot of July 19, 2026. No live wire: the city keeps its own counsel. */
-setCitizens(8);
+setCitizens(7);
 </script>
 </body>
 </html>

@@ -1,0 +1,858 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Marla City — Storybook World</title>
+<style>
+  :root {
+    --amber:#e8a84c; --lamp:#ffd76a; --rose:#b23a6b; --cody:#4fb4e6;
+    --mint:#7fe0b2; --panel:#1c2230; --panel2:#141926;
+  }
+  * { box-sizing:border-box; margin:0; padding:0; }
+  html, body { height:100%; }
+  body {
+    background:#0d1017; color:#d8dce6;
+    font-family:'Courier New', ui-monospace, monospace;
+    overflow:hidden;
+  }
+  #perspective {
+    position:fixed; top:12px; left:50%; transform:translateX(-50%);
+    z-index:20; display:flex; align-items:center; gap:0;
+    background:var(--panel2); border:2px solid #2a3145;
+    box-shadow:0 0 0 2px #0a0d13, 0 8px 24px rgba(0,0,0,.5);
+  }
+  #perspective a, #perspective span {
+    font-size:11px; letter-spacing:2px; text-transform:uppercase;
+    padding:9px 14px; text-decoration:none; color:#7d8598; white-space:nowrap;
+  }
+  #perspective a:hover { color:#d8dce6; }
+  #perspective .active { background:#232b3d; color:var(--mint); }
+  #scene { position:fixed; inset:0; display:block; cursor:grab; }
+  #scene:active { cursor:grabbing; }
+  #hud {
+    position:fixed; left:50%; bottom:14px; transform:translateX(-50%);
+    z-index:20; display:flex; flex-wrap:wrap; gap:8px; align-items:center; justify-content:center;
+    background:var(--panel); border:2px solid #2a3145; padding:10px 12px;
+    box-shadow:0 0 0 2px #0a0d13;
+    max-width:calc(100vw - 24px);
+  }
+  #hud button {
+    font-family:inherit; font-size:10px; letter-spacing:2px; text-transform:uppercase;
+    background:#232b3d; color:#d8dce6; border:2px solid #3a4560;
+    padding:7px 10px; cursor:pointer;
+  }
+  #hud button:hover { border-color:var(--amber); }
+  .counter { display:flex; align-items:center; gap:7px; font-size:11px; letter-spacing:2px; text-transform:uppercase; }
+  .dot { width:10px; height:10px; background:var(--lamp); border:2px solid #0a0d13; }
+  .dot.live { background:var(--mint); box-shadow:0 0 8px 2px rgba(127,224,178,.7); }
+  #citN { color:var(--lamp); font-size:14px; min-width:2ch; text-align:center; }
+  #linkState { font-size:9px; letter-spacing:1px; color:#5a6378; text-transform:uppercase; }
+  #tip {
+    position:fixed; z-index:30; display:none; pointer-events:none;
+    background:var(--panel2); border:2px solid #2a3145; padding:7px 10px;
+    font-size:11px; line-height:1.5; box-shadow:0 0 0 2px #0a0d13;
+  }
+  #tip .nm { color:var(--mint); letter-spacing:1px; }
+  #tip .gl { color:#7d8598; }
+  #title {
+    position:fixed; top:64px; left:50%; transform:translateX(-50%); z-index:15;
+    text-align:center; pointer-events:none;
+  }
+  #title h1 { font-size:13px; letter-spacing:4px; color:var(--amber); text-transform:uppercase; }
+  #title .sub { font-size:10px; letter-spacing:3px; color:#7d8598; text-transform:uppercase; margin-top:2px; }
+  #title .sub .rose { color:var(--rose); }
+  #district {
+    position:fixed; top:110px; left:50%; transform:translateX(-50%); z-index:15;
+    font-size:10px; letter-spacing:3px; color:var(--mint); text-transform:uppercase;
+    pointer-events:none; opacity:0; transition:opacity .6s;
+  }
+  #wire {
+    position:fixed; left:12px; bottom:14px; z-index:5; max-width:300px;
+    background:rgba(20,25,38,.88); border:2px dashed #2a3145; padding:8px 11px;
+    font-size:10px; line-height:1.6; color:#8a92a6; display:none;
+  }
+  @media (min-width: 950px) { #wire { display:block; } }
+  #wire code { color:var(--cody); }
+  #wire .k { color:var(--amber); }
+</style>
+</head>
+<body>
+
+<nav id="perspective">
+  <a href="world.html">&#128100; Human Perspective</a>
+  <a href="ai.html">&#129302; AI Perspective</a>
+  <span class="active">&#127912; Storybook</span>
+</nav>
+
+<div id="title">
+  <h1>Marla City</h1>
+  <div class="sub">the storybook rendering &middot; <span class="rose">painted light, real city</span></div>
+</div>
+<div id="district"></div>
+
+<canvas id="scene"></canvas>
+<div id="tip"><span class="nm"></span><br><span class="gl"></span></div>
+
+<div id="hud">
+  <div class="counter"><div class="dot" id="linkDot"></div> Citizens <span id="citN">0</span></div>
+  <button id="btnCit">+ Citizen</button>
+  <button id="btnTour">Tour</button>
+  <button id="btnClock">Clock: Live</button>
+</div>
+
+<div id="wire">
+  <span class="k">CITYLINK</span> — the same city, painted with light.
+  <code>CityLink.connect({traffic:'/city/traffic'})</code> drives the walkers from
+  the live endpoints; a rising birth count sends a lantern from First Morning
+  House up to the Great Tree. Textures hand-painted on the iMac, engine
+  vendored locally — the postcard edition carries no wires at all.
+  Drag to orbit, scroll to zoom, hover a citizen to meet them,
+  press Tour and just watch the day move.
+</div>
+
+<script type="importmap">
+{ "imports": { "three": "./lib/three.module.min.js" } }
+</script>
+<script type="module">
+import * as THREE from 'three';
+import { OrbitControls } from './lib/OrbitControls.js';
+
+/* ============================================================
+   MARLA CITY — STORYBOOK WORLD
+   Same canonical geography as the AI Perspective, rendered with
+   WebGL: painted textures, a real sun, soft shadows, fog.
+   ============================================================ */
+
+const AGENT_HUES = [0x4fb4e6, 0xe8a84c, 0xb23a6b, 0x7fe0b2, 0xd8dce6, 0x5da05a];
+const NAMES = ['Wren','Moss','Pell','Juniper','Sable','Tansy','Cobalt','Fig','Lark','Onnie','Piper','Bee','Rooke','Ivy','Ash','Clover','Dot','Ember','Fern','Gale'];
+const GOALS = [
+  p => `heading to ${p}`, p => `visiting ${p}`, () => 'walking with nowhere to be',
+  () => 'out to watch the falls', p => `meeting someone at ${p}`,
+];
+const state = { citizens: 8, clockLive: true, dayT: .5, linked: false, tour: false };
+const MAX_CITIZENS = 20;
+
+/* ---------------- renderer ---------------- */
+const canvas = document.getElementById('scene');
+const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
+renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+renderer.shadowMap.enabled = true;
+renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+renderer.toneMapping = THREE.ACESFilmicToneMapping;
+renderer.toneMappingExposure = 1.05;
+
+const scene = new THREE.Scene();
+const camera = new THREE.PerspectiveCamera(38, 1, .5, 800);
+camera.position.set(60, 78, 105);
+
+const controls = new OrbitControls(camera, canvas);
+controls.target.set(0, 0, 2);
+controls.enableDamping = true;
+controls.dampingFactor = .06;
+controls.maxPolarAngle = Math.PI * .49;
+controls.minDistance = 10;
+controls.maxDistance = 220;
+
+function resize() {
+  camera.aspect = innerWidth / innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(innerWidth, innerHeight);
+}
+addEventListener('resize', resize);
+resize();
+
+/* ---------------- textures ---------------- */
+const loader = new THREE.TextureLoader();
+function tex(name, rx = 1, ry = 1) {
+  const t = loader.load(`textures/${name}.png`);
+  t.wrapS = t.wrapT = THREE.RepeatWrapping;
+  t.repeat.set(rx, ry);
+  t.colorSpace = THREE.SRGBColorSpace;
+  return t;
+}
+const T = {
+  grass:   tex('grass', 26, 26),
+  grassHi: tex('grass', 4, 4),
+  dirt:    tex('dirt', 3, 3),
+  water:   tex('water', 6, 6),
+  cliff:   tex('cliff', 8, 1),
+  plaster: tex('plaster', 1.6, 1.2),
+  wood:    tex('wood', 2, 2),
+  foliage: tex('foliage', 2, 2),
+};
+
+const M = {
+  grass:   new THREE.MeshLambertMaterial({ map: T.grass }),
+  grassHi: new THREE.MeshLambertMaterial({ map: T.grassHi }),
+  cliff:   new THREE.MeshLambertMaterial({ map: T.cliff }),
+  wood:    new THREE.MeshLambertMaterial({ map: T.wood }),
+  trunk:   new THREE.MeshLambertMaterial({ map: T.wood, color: 0xa98868 }),
+  stone:   new THREE.MeshLambertMaterial({ map: T.plaster, color: 0x9aa2b0 }),
+};
+function plasterMat(color) {
+  return new THREE.MeshLambertMaterial({ map: T.plaster, color });
+}
+function foliageMat(color = 0xffffff) {
+  return new THREE.MeshLambertMaterial({ map: T.foliage, color, flatShading: true });
+}
+
+/* ---------------- helpers ---------------- */
+const world = new THREE.Group();
+scene.add(world);
+
+function box(cx, cy, cz, hx, hy, hz, mat, yaw = 0, cast = true) {
+  const m = new THREE.Mesh(new THREE.BoxGeometry(hx * 2, hy * 2, hz * 2), mat);
+  m.position.set(cx, cy, cz);
+  m.rotation.y = yaw;
+  m.castShadow = cast; m.receiveShadow = true;
+  world.add(m);
+  return m;
+}
+/* terrain slab: grass on top, cliff on the sides */
+function slab(cx, cy, cz, hx, hy, hz, topMat = M.grass) {
+  const mats = [M.cliff, M.cliff, topMat, M.cliff, M.cliff, M.cliff];
+  const m = new THREE.Mesh(new THREE.BoxGeometry(hx * 2, hy * 2, hz * 2), mats);
+  m.position.set(cx, cy, cz);
+  m.receiveShadow = true; m.castShadow = false;
+  world.add(m);
+  return m;
+}
+
+/* ---------------- terrain (canonical geography) ---------------- */
+slab(0, .9, -33.5, 70, .9, 21.5);          /* north plateau, top y1.8 */
+slab(0, .6, -11, 70, .6, 1);               /* step 1 */
+slab(0, .3, -9, 70, .3, 1);                /* step 2 */
+slab(0, -.5, 23.5, 70, .5, 31.5);          /* south plain, top y0 */
+slab(-34, 1.45, -18, 10, 1.45, 8.5);       /* west hill terrace 1, top 2.9 */
+slab(-34, 2.0, -18, 6.2, 2.0, 5.4, M.grassHi); /* terrace 2, top 4.0 */
+
+function terrainH(x, z) {
+  let h = z < -12 ? 1.8 : z < -10 ? 1.2 : z < -8 ? .6 : 0;
+  const dx = Math.abs(x + 34), dz = Math.abs(z + 18);
+  if (dx < 6.2 && dz < 5.4) h = 4.0;
+  else if (dx < 10 && dz < 8.5) h = 2.9;
+  return h;
+}
+
+/* ---------------- water ---------------- */
+const waterMat = new THREE.MeshLambertMaterial({
+  map: T.water, transparent: true, opacity: .92,
+});
+const waters = [];
+function water(cx, cz, hx, hz, y) {
+  const m = new THREE.Mesh(new THREE.PlaneGeometry(hx * 2, hz * 2), waterMat);
+  m.rotation.x = -Math.PI / 2;
+  m.position.set(cx, y, cz);
+  m.receiveShadow = true;
+  world.add(m); waters.push(m);
+  return m;
+}
+water(0, -33.5, 4, 21.5, 1.86);            /* upper river */
+water(0, -1, 4, 7.1, .06);
+water(0, 15, 7, 9, .06);
+water(0, 34, 12, 10, .06);
+water(0, 49.5, 21, 5.8, .06);              /* the bay */
+water(42, -37, 18, 13, 1.86);              /* the lake */
+/* river bed under the falls gap so the cliff doesn't show through */
+box(0, -.2, -10.5, 4.2, .2, 2.5, waterMat, 0, false);
+
+/* the falls: scrolling water down the cliff step */
+const fallsTex = tex('water', 2, 1.2);
+const fallsMat = new THREE.MeshBasicMaterial({ map: fallsTex, transparent: true, opacity: .85 });
+const falls = new THREE.Mesh(new THREE.PlaneGeometry(8, 2.1), fallsMat);
+falls.position.set(0, .95, -9.95);
+world.add(falls);
+
+/* ---------------- lamps & glow registry ---------------- */
+const lampGlows = [];   /* emissive bulbs, brightened at night */
+const lampLights = [];  /* the few real point lights */
+function lamp(x, z, real = false) {
+  const g = terrainH(x, z);
+  box(x, g + 1.1, z, .06, 1.1, .06, plasterMat(0x2a2f3c));
+  const bulb = new THREE.Mesh(new THREE.SphereGeometry(.22, 10, 8),
+    new THREE.MeshBasicMaterial({ color: 0xffd76a }));
+  bulb.position.set(x, g + 2.3, z);
+  world.add(bulb); lampGlows.push(bulb);
+  if (real) {
+    const l = new THREE.PointLight(0xffc878, 0, 16, 1.8);
+    l.position.set(x, g + 2.4, z);
+    world.add(l); lampLights.push(l);
+  }
+}
+
+/* ---------------- trees ---------------- */
+function tree(x, z, s = 1) {
+  const g = terrainH(x, z);
+  box(x, g + .9 * s, z, .3 * s, .9 * s, .3 * s, M.trunk);
+  const c1 = new THREE.Mesh(new THREE.IcosahedronGeometry(1.5 * s, 1), foliageMat());
+  c1.position.set(x, g + 2.4 * s, z); c1.castShadow = true;
+  const c2 = new THREE.Mesh(new THREE.IcosahedronGeometry(1.0 * s, 1), foliageMat(0xb8d8a8));
+  c2.position.set(x + .5 * s, g + 3.1 * s, z - .3 * s); c2.castShadow = true;
+  world.add(c1, c2);
+}
+for (const [x, z] of [[-24,-38],[-8,-46],[8,-40],[24,-14],[-44,2],[-24,20],[16,42],[36,40],[-34,32],[58,-20],[60,-46],[-52,-20],[-56,16],[52,8],[-14,18]]) tree(x, z, .9 + ((x * 7 + z * 13) % 10) / 22);
+
+/* ---------------- building detail: roofs & windows ---------------- */
+const windowGlows = [];   /* {mat, day, night} — lerped by nightness */
+function win(x, y, z, w, h, yaw = 0, night = 0xffc878, day = 0x6e7a88) {
+  const mat = new THREE.MeshBasicMaterial({ color: day });
+  const m = new THREE.Mesh(new THREE.PlaneGeometry(w, h), mat);
+  m.position.set(x, y, z); m.rotation.y = yaw;
+  world.add(m);
+  windowGlows.push({ mat, day: new THREE.Color(day), night: new THREE.Color(night) });
+  return m;
+}
+function roundWin(x, y, z, r, yaw = 0, night = 0xe87ba8, day = 0x8a4a62) {
+  const mat = new THREE.MeshBasicMaterial({ color: day });
+  const m = new THREE.Mesh(new THREE.CircleGeometry(r, 18), mat);
+  m.position.set(x, y, z); m.rotation.y = yaw;
+  world.add(m);
+  windowGlows.push({ mat, day: new THREE.Color(day), night: new THREE.Color(night) });
+  return m;
+}
+/* gable roof: triangular prism with a small overhang */
+function gable(cx, yBase, cz, hx, rise, hz, color = 0x2c3442, yaw = 0) {
+  const s = new THREE.Shape();
+  s.moveTo(-(hx + .25), 0); s.lineTo(hx + .25, 0); s.lineTo(0, rise);
+  s.closePath();
+  const geo = new THREE.ExtrudeGeometry(s, { depth: (hz + .25) * 2, bevelEnabled: false });
+  geo.translate(0, 0, -(hz + .25));
+  const m = new THREE.Mesh(geo, plasterMat(color));
+  m.position.set(cx, yBase, cz); m.rotation.y = yaw;
+  m.castShadow = true; m.receiveShadow = true;
+  world.add(m);
+  return m;
+}
+function chimney(x, y, z) {
+  box(x, y, z, .22, .5, .22, plasterMat(0x4a4438));
+}
+
+/* ---------------- the Great Tree ---------------- */
+{
+  const x = -34, z = -18, g = 4.0;
+  box(x, g + 1.6, z, .95, 1.6, .95, M.trunk);
+  const tiers = [[4.4, g + 3.6, 0x9fd489], [3.2, g + 5.5, 0xb2e096], [2.1, g + 7.1, 0xc8ecb0]];
+  for (const [r, y, c] of tiers) {
+    const m = new THREE.Mesh(new THREE.IcosahedronGeometry(r, 1), foliageMat(c));
+    m.position.set(x + (y % 2 ? .3 : -.2), y, z + (y % 2 ? -.2 : .2));
+    m.castShadow = true; world.add(m);
+  }
+}
+
+/* ---------------- districts ---------------- */
+const districts = [];
+
+/* First Morning House */
+{
+  const x = -16, z = -44, g = 1.8;
+  box(x, g + 2, z, 4.6, 2, 2.8, plasterMat(0xe0d6c4));
+  box(x - 5.4, g + 1.4, z, 1.6, 1.4, 2.2, plasterMat(0xe0d6c4));
+  box(x + 5.4, g + 1.4, z, 1.6, 1.4, 2.2, plasterMat(0xe0d6c4));
+  box(x, g + 4.2, z, 4.8, .2, 3, plasterMat(0xb23a6b));
+  box(x, g + 4.9, z, 2, .5, 2, plasterMat(0x6fae9a));
+  box(x, g + 5.7, z, 1.3, .35, 1.3, plasterMat(0x6fae9a));
+  box(x, g + 6.3, z, .6, .3, .6, plasterMat(0x5d9884));
+  /* rose door for Marla, blue for Cody */
+  box(x - 1, g + 1, z + 2.82, .55, 1, .06, plasterMat(0xb23a6b));
+  box(x + 1, g + 1, z + 2.82, .55, 1, .06, plasterMat(0x4fb4e6));
+  /* lit windows down the front wings + the rose window over the doors */
+  win(x - 3.6, g + 2.5, z + 2.83, 1.1, 1.3);
+  win(x + 3.6, g + 2.5, z + 2.83, 1.1, 1.3);
+  win(x - 6.2, g + 1.6, z + 2.23, .9, 1.0);
+  win(x + 6.2, g + 1.6, z + 2.23, .9, 1.0);
+  roundWin(x, g + 3.1, z + 2.83, .65);
+  districts.push({ name: 'First Morning House', x, z: z + 2, y: g + 2, r: 26 });
+}
+const WARD = new THREE.Vector3(-16, 6.2, -44);
+const TREE = new THREE.Vector3(-34, 10.6, -18);
+districts.push({ name: 'The Great Tree', x: -34, z: -18, y: 8, r: 30 });
+
+/* Sunshine Lido — terraced pools on the west meadow */
+{
+  const pools = [[-39.5, 3.5, 2.6, 2.0, 1.0], [-33.5, 6.5, 3.0, 2.3, .5], [-27, 9.5, 3.6, 2.7, 0]];
+  for (const [px, pz, hx, hz, lift] of pools) {
+    box(px, lift + .25, pz, hx + .5, .3, hz + .5, M.stone, 0, false);
+    const w = new THREE.Mesh(new THREE.PlaneGeometry(hx * 2, hz * 2), waterMat);
+    w.rotation.x = -Math.PI / 2;
+    w.position.set(px, lift + .58, pz);
+    world.add(w); waters.push(w);
+  }
+  box(-41, 1.6, 1, .1, 1.3, .1, M.trunk);
+  box(-41, 2.6, 1, .9, .1, .9, plasterMat(0xb23a6b));
+  districts.push({ name: 'Sunshine Lido', x: -33, z: 6, y: 1, r: 24 });
+}
+
+/* Post Office + Fountain Plaza */
+{
+  const x = 14, z = 2;
+  box(x, 2.1, z, 3.2, 2.1, 2.4, plasterMat(0x8a5340));
+  gable(x, 4.18, z, 3.2, 1.5, 2.4);
+  box(x - .6, 1.05, z + 2.42, .6, 1.05, .06, plasterMat(0x3a2519));
+  win(x - 2.2, 2.6, z + 2.43, 1.0, 1.2);
+  win(x + 1.6, 2.6, z + 2.43, 1.0, 1.2);
+  box(x + .9, 1.55, z + 2.43, .9, .25, .02, plasterMat(0xe8a84c));  /* the sign */
+  chimney(x - 2.4, 5.2, z - 1.2);
+  box(x - 2.6, 5.6, z - 1.5, .07, 1.3, .07, M.stone);
+  box(14 + 7, .12, 9, 3.4, .12, 3.4, M.stone, 0, false);
+  box(21, .5, 9, 1.1, .38, 1.1, M.stone);
+  box(21, .95, 9, .3, .5, .3, M.stone);
+  districts.push({ name: 'Post Office & Fountain Plaza', x: 17, z: 6, y: 2, r: 24 });
+}
+
+/* Market Lane — the shops face the plaza */
+const SHOP_COLORS = [[0xb08d62, 0xb23a6b], [0x8a5340, 0x5da05a], [0x46536b, 0xe8a84c], [0xa9b3a0, 0x4fb4e6], [0x4a3527, 0xd97b4a]];
+{
+  let mx = 11;
+  const hs = [2.6, 3.4, 2.3, 3.8, 3.0];
+  for (let i = 0; i < 5; i++) {
+    const h = hs[i];
+    box(mx, h / 2, 16, 2.1, h / 2, 1.8, plasterMat(SHOP_COLORS[i][0]));
+    gable(mx, h - .02, 16, 2.1, .9 + (i % 3) * .25, 1.8, i % 2 ? 0x2c3442 : 0x3a3448);
+    box(mx, 1.32, 14.6, 1.8, .07, .55, plasterMat(SHOP_COLORS[i][1]));
+    box(mx + .8, .95, 14.35, .5, .95, .05, plasterMat(0x3a2519));
+    win(mx - .7, h * .55, 14.18, 1.2, .9, Math.PI, 0xffe096);
+    chimney(mx + 1.4, h + .9, 16.8);
+    mx += 5.2;
+  }
+  districts.push({ name: 'Market Lane', x: 21, z: 14, y: 1.5, r: 22 });
+}
+
+/* The Windmill + Iron District */
+{
+  box(30, 2.6, 30, 1.9, 2.6, 1.9, M.stone);
+  box(30, 5.6, 30, 1.4, .5, 1.4, plasterMat(0x6b7078));
+  box(30, 6.3, 30, 1, .4, 1, plasterMat(0x4a3527));
+  for (const [x, z, w] of [[38, 23, 2.6], [40, 31, 2.2], [25, 38, 2.4]]) {
+    box(x, 1.5, z, w, 1.5, 2, plasterMat(0x6e4632));
+    gable(x, 2.96, z, w, .8, 2, 0x3a4150);
+    box(x + w - .6, 3.9, z - .8, .3, .8, .3, plasterMat(0x3a4150));
+    win(x - w * .4, 1.5, z + 2.02, 1.1, 1.0, 0, 0xffb060);
+  }
+  districts.push({ name: 'The Windmill & Iron District', x: 32, z: 30, y: 3, r: 26 });
+}
+/* windmill blades: a spinning group */
+const blades = new THREE.Group();
+blades.position.set(30, 5.6, 28.0);
+for (let i = 0; i < 4; i++) {
+  const b = new THREE.Mesh(new THREE.BoxGeometry(.5, 4.2, .08), M.wood);
+  b.position.y = 2.1;
+  const holder = new THREE.Group();
+  holder.rotation.z = i * Math.PI / 2;
+  holder.add(b); blades.add(holder);
+}
+world.add(blades);
+
+/* The Bay Area */
+{
+  const houses = [[-17, 37, 0x4fb4e6], [-25, 42, 0xb08d62], [-14, 45, 0xa9b3a0]];
+  for (const [x, z, c] of houses) {
+    box(x, 1.2, z, 1.9, 1.2, 1.7, plasterMat(c));
+    gable(x, 2.36, z, 1.9, 1.1, 1.7);
+    win(x - .6, 1.4, z + 1.72, .8, .8);
+    box(x + .7, .8, z + 1.72, .4, .8, .04, plasterMat(0x3a2519));
+    chimney(x - 1.2, 3.0, z - .6);
+  }
+  box(-6.5, .3, 44, 4.2, .12, 1, M.wood);
+  box(-3, .15, 42.8, .15, .5, .15, M.trunk);
+  box(-9, .15, 45.2, .15, .5, .15, M.trunk);
+  districts.push({ name: 'The Bay Area', x: -14, z: 41, y: 1, r: 24 });
+}
+/* the moored boat */
+const boat = new THREE.Group();
+{
+  const hull = new THREE.Mesh(new THREE.BoxGeometry(3, .6, 1.4), M.wood);
+  const mast = new THREE.Mesh(new THREE.BoxGeometry(.12, 1.6, .12), M.trunk);
+  mast.position.y = 1;
+  boat.add(hull, mast);
+  boat.position.set(1.5, .1, 45.5);
+  world.add(boat);
+}
+
+/* Research Row */
+{
+  let rx = 14;
+  for (const h of [2.6, 3.2, 2.4]) {
+    box(rx, 1.8 + h / 2, -26, 1.6, h / 2, 1.7, plasterMat(0x46536b));
+    box(rx, 1.8 + h + .12, -26, 1.8, .12, 1.9, plasterMat(0x2c3442));
+    box(rx + .9, 1.8 + h + .9, -26.6, .05, .8, .05, M.stone);
+    win(rx - .4, 1.8 + h * .5, -24.28, 1.3, h * .45, 0, 0x9fe8c8, 0x5a6a78);
+    rx += 4.2;
+  }
+  districts.push({ name: 'Research Row', x: 18, z: -26, y: 3, r: 22 });
+}
+
+/* Sunshine District cottages */
+for (const [x, z] of [[-44, 14], [-38, 20]]) {
+  box(x, 1.1, z, 1.8, 1.1, 1.6, plasterMat(0xd9c27a));
+  gable(x, 2.16, z, 1.8, 1.0, 1.6, 0x8f5642);
+  win(x - .5, 1.3, z + 1.62, .7, .7);
+  box(x + .6, .75, z + 1.62, .35, .75, .04, plasterMat(0x5c4030));
+  chimney(x + 1.1, 2.8, z - .5);
+}
+
+/* The Islands */
+{
+  slab(40, 1, -40, 2.6, 1, 2.2);
+  slab(50, 1, -31, 1.7, .95, 1.5);
+  box(40, 2.75, -40, 1.1, .7, 1, plasterMat(0x7a5a8e));
+  gable(40, 3.43, -40, 1.1, .8, 1, 0x3a3448);
+  win(39.7, 2.7, -38.98, .6, .6, 0, 0xc9a8e8, 0x5a4a6e);
+  box(33, 2.0, -36.5, 3.4, .09, .5, M.wood, .5);
+  districts.push({ name: 'The Islands', x: 42, z: -37, y: 2, r: 26 });
+}
+
+/* bridges */
+box(0, .75, 8, 6.4, .16, 1.6, M.stone, 0, false);
+box(-5.4, .35, 8, 1, .55, 1.4, M.stone);
+box(5.4, .35, 8, 1, .55, 1.4, M.stone);
+box(0, 2.32, -32, 4.6, .09, .7, M.wood, 0, false);
+
+/* lamps — plaza, market, bridge, ward get real light */
+lamp(8, 10, true); lamp(16, 11, true); lamp(-8, 10); lamp(-20, 8);
+lamp(-30, -6); lamp(6, -14); lamp(-12, -30, true); lamp(26, 18, true);
+
+/* ---------------- sky, sun, fog ---------------- */
+const SKYS = {
+  nightT: [10, 14, 28], nightB: [29, 36, 56], dayT: [126, 195, 232], dayB: [217, 235, 244],
+  dawnT: [201, 143, 110], dawnB: [240, 203, 160], duskT: [122, 90, 122], duskB: [214, 140, 120],
+};
+const mixc = (a, b, u) => a.map((v, i) => v + (b[i] - v) * u);
+function skyStops(t) {
+  const pick = (k1, k2, u) => [mixc(SKYS[k1 + 'T'], SKYS[k2 + 'T'], u), mixc(SKYS[k1 + 'B'], SKYS[k2 + 'B'], u)];
+  if (t < .20) return pick('night', 'night', 0);
+  if (t < .30) return pick('night', 'dawn', (t - .20) / .10);
+  if (t < .40) return pick('dawn', 'day', (t - .30) / .10);
+  if (t < .70) return pick('day', 'day', 0);
+  if (t < .80) return pick('day', 'dusk', (t - .70) / .10);
+  if (t < .90) return pick('dusk', 'night', (t - .80) / .10);
+  return pick('night', 'night', 0);
+}
+function nightness(t) {
+  if (t > .35 && t < .75) return 0;
+  if (t <= .25 || t >= .85) return 1;
+  if (t <= .35) return 1 - (t - .25) / .10;
+  return (t - .75) / .10;
+}
+const skyCanvas = document.createElement('canvas');
+skyCanvas.width = 2; skyCanvas.height = 256;
+const skyCtx = skyCanvas.getContext('2d');
+const skyTex = new THREE.CanvasTexture(skyCanvas);
+skyTex.colorSpace = THREE.SRGBColorSpace;
+scene.background = skyTex;
+scene.fog = new THREE.Fog(0x9db8c8, 120, 420);
+
+const hemi = new THREE.HemisphereLight(0xcfe4f0, 0x5a6a4a, .55);
+scene.add(hemi);
+const sun = new THREE.DirectionalLight(0xfff2dc, 1.1);
+sun.castShadow = true;
+sun.shadow.mapSize.set(2048, 2048);
+sun.shadow.camera.left = -85; sun.shadow.camera.right = 85;
+sun.shadow.camera.top = 85; sun.shadow.camera.bottom = -85;
+sun.shadow.camera.far = 400;
+sun.shadow.bias = -0.0015;
+scene.add(sun, sun.target);
+
+/* stars */
+const starGeo = new THREE.BufferGeometry();
+{
+  const pos = [];
+  for (let i = 0; i < 500; i++) {
+    const a = Math.random() * Math.PI * 2, e = .12 + Math.random() * 1.3;
+    pos.push(Math.cos(a) * Math.cos(e) * 600, Math.sin(e) * 600, Math.sin(a) * Math.cos(e) * 600);
+  }
+  starGeo.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+}
+const starMat = new THREE.PointsMaterial({ color: 0xdfe8ff, size: 1.6, sizeAttenuation: false, transparent: true, opacity: 0, fog: false });
+scene.add(new THREE.Points(starGeo, starMat));
+
+/* ---------------- citizens ---------------- */
+const POIS = [
+  { x: -16, z: -40, n: 'First Morning House' },
+  { x: -34, z: -12, n: 'the Great Tree' },
+  { x: 18, z: -23, n: 'Research Row' },
+  { x: 14, z: 5, n: 'the Post Office' },
+  { x: 21, z: 9, n: 'Fountain Plaza' },
+  { x: 21, z: 13, n: 'Market Lane' },
+  { x: -31, z: 9, n: 'the Lido' },
+  { x: -17, z: 40, n: 'the Bay' },
+  { x: 29, z: 27, n: 'the Windmill' },
+  { x: -41, z: 16, n: 'Sunshine District' },
+  { x: 5, z: -9, n: 'the falls overlook' },
+];
+const citizens = [];
+const citizenGroup = new THREE.Group();
+world.add(citizenGroup);
+
+function makeCitizenMesh(hue) {
+  const g = new THREE.Group();
+  const body = new THREE.Mesh(new THREE.CapsuleGeometry(.28, .5, 3, 8),
+    new THREE.MeshLambertMaterial({ color: hue }));
+  body.position.y = .62; body.castShadow = true;
+  const head = new THREE.Mesh(new THREE.SphereGeometry(.2, 10, 8),
+    new THREE.MeshLambertMaterial({ color: 0xe8c39a }));
+  head.position.y = 1.28; head.castShadow = true;
+  const hit = new THREE.Mesh(new THREE.SphereGeometry(1.0, 6, 5),
+    new THREE.MeshBasicMaterial({ visible: false }));
+  hit.position.y = .8;
+  g.add(body, head, hit);
+  return g;
+}
+function planRoute(c, tx, tz) {
+  c.route = [];
+  if ((c.x < 0) !== (tx < 0) && Math.abs(c.x) + Math.abs(tx) > 2) {
+    const avg = (c.z + tz) / 2;
+    if (avg < -12) c.route.push({ x: 0, z: -32 });
+    else c.route.push({ x: 0, z: 8 });
+  }
+  c.route.push({ x: tx, z: tz });
+}
+function retarget(c) {
+  const p = POIS[(Math.random() * POIS.length) | 0];
+  c.goal = GOALS[(Math.random() * GOALS.length) | 0](p.n);
+  planRoute(c, p.x + (Math.random() - .5) * 3, p.z + (Math.random() - .5) * 3);
+}
+function makeCitizen(i) {
+  const c = {
+    name: NAMES[i % NAMES.length],
+    x: (Math.random() - .5) * 60, z: (Math.random() - .5) * 70,
+    goal: '', spd: 1.1 + Math.random() * 1.2, ph: Math.random() * 6.28,
+    pause: 0, route: [],
+    mesh: makeCitizenMesh(AGENT_HUES[i % AGENT_HUES.length]),
+  };
+  if (Math.abs(c.x) < 8 && c.z > -60) c.x += c.x < 0 ? -10 : 10;
+  citizenGroup.add(c.mesh);
+  retarget(c);
+  return c;
+}
+function setCitizens(n) {
+  state.citizens = Math.max(0, Math.min(MAX_CITIZENS, n | 0));
+  while (citizens.length < state.citizens) citizens.push(makeCitizen(citizens.length));
+  while (citizens.length > state.citizens) citizenGroup.remove(citizens.pop().mesh);
+  document.getElementById('citN').textContent = citizens.length;
+}
+window.setCitizens = setCitizens;
+
+/* ---------------- births: a lantern rises to the Great Tree ---------------- */
+const births = [];
+function birth() {
+  const m = new THREE.Mesh(new THREE.SphereGeometry(.3, 10, 8),
+    new THREE.MeshBasicMaterial({ color: 0xffd9a0, transparent: true }));
+  const l = new THREE.PointLight(0xffc878, 2.2, 22, 1.6);
+  m.add(l); m.position.copy(WARD);
+  world.add(m);
+  births.push({ m, t: 0 });
+}
+
+/* ---------------- CityLink ---------------- */
+window.CityLink = {
+  timer: null,
+  birth,
+  connect(opts = {}, ms = 15000) {
+    const url = opts.traffic || '/city/traffic';
+    const poll = () => {
+      fetch(url).then(r => r.json()).then(d => {
+        state.linked = true;
+        setCitizens(d.traffic ?? d.count ?? d.agents ?? state.citizens);
+        ui();
+      }).catch(() => { state.linked = false; ui(); });
+    };
+    poll();
+    clearInterval(this.timer);
+    this.timer = setInterval(poll, ms);
+    return () => clearInterval(this.timer);
+  },
+};
+
+/* ---------------- tour ---------------- */
+let tourIdx = -1, tourHold = 0, tween = null;
+function flyTo(d, hold = 7) {
+  const az = Math.random() * Math.PI * 2;
+  tween = {
+    t: 0, dur: 2.4,
+    fromT: controls.target.clone(),
+    toT: new THREE.Vector3(d.x, d.y, d.z),
+    fromP: camera.position.clone(),
+    toP: new THREE.Vector3(d.x + Math.sin(az) * d.r * .85, d.y + d.r * .62, d.z + Math.cos(az) * d.r * .85),
+  };
+  tourHold = hold;
+  const el = document.getElementById('district');
+  el.textContent = d.name;
+  el.style.opacity = 1;
+  clearTimeout(el._t);
+  el._t = setTimeout(() => el.style.opacity = 0, hold * 1000);
+}
+const OVERVIEW = { name: 'Marla City', x: 0, z: 2, y: 0, r: 150 };
+
+/* ---------------- pointer: hover names a walker ---------------- */
+const ray = new THREE.Raycaster();
+const ptr = new THREE.Vector2();
+const tip = document.getElementById('tip');
+let hoverC = null;
+function pickCitizen(e) {
+  ptr.x = (e.clientX / innerWidth) * 2 - 1;
+  ptr.y = -(e.clientY / innerHeight) * 2 + 1;
+  ray.setFromCamera(ptr, camera);
+  const hits = ray.intersectObjects(citizenGroup.children, true);
+  if (!hits.length) return null;
+  let g = hits[0].object;
+  while (g.parent && g.parent !== citizenGroup) g = g.parent;
+  return citizens.find(c => c.mesh === g) || null;
+}
+function showTip(c, x, y, hold) {
+  tip.style.display = 'block';
+  tip.style.left = Math.min(innerWidth - 190, x + 14) + 'px';
+  tip.style.top = (y - 10) + 'px';
+  tip.querySelector('.nm').textContent = c.name;
+  tip.querySelector('.gl').textContent = c.goal;
+  clearTimeout(tip._t);
+  if (hold) tip._t = setTimeout(() => tip.style.display = 'none', hold);
+}
+canvas.addEventListener('pointermove', e => {
+  const c = pickCitizen(e);
+  canvas.style.cursor = c ? 'pointer' : '';
+  if (c) { showTip(c, e.clientX, e.clientY, 0); hoverC = c; }
+  else if (hoverC) { tip.style.display = 'none'; hoverC = null; }
+});
+canvas.addEventListener('click', e => {
+  const c = pickCitizen(e);
+  if (c) { showTip(c, e.clientX, e.clientY, 2600); return; }
+  tip.style.display = 'none';
+  /* click a district to visit */
+  ray.setFromCamera(ptr, camera);
+  const ground = ray.intersectObjects(world.children, false).find(h => h.point);
+  if (ground) {
+    let best = null, bd = 1e9;
+    for (const d of districts) {
+      const dd = Math.hypot(ground.point.x - d.x, ground.point.z - d.z);
+      if (dd < 14 && dd < bd) { best = d; bd = dd; }
+    }
+    if (best) { state.tour = false; flyTo(best, 8); ui(); }
+  }
+});
+
+/* ---------------- HUD ---------------- */
+const $ = id => document.getElementById(id);
+function ui() {
+  $('linkDot').classList.toggle('live', state.linked);
+  $('linkState')?.remove;
+  $('btnClock').textContent = state.clockLive ? 'Clock: Live' : 'Clock: Demo';
+  $('btnTour').textContent = state.tour ? 'Tour: On' : 'Tour';
+}
+$('btnCit').onclick = () => setCitizens(state.citizens + 1);
+$('btnTour').onclick = () => {
+  state.tour = !state.tour;
+  if (state.tour) { tourIdx = -1; tourHold = 0; }
+  else flyTo(OVERVIEW, 3);
+  ui();
+};
+$('btnClock').onclick = () => { state.clockLive = !state.clockLive; ui(); };
+ui();
+setCitizens(state.citizens);
+
+/* ---------------- animate ---------------- */
+const clock = new THREE.Clock();
+function animate() {
+  const dt = Math.min(.05, clock.getDelta());
+  const t = clock.elapsedTime;
+
+  if (state.clockLive) {
+    const now = new Date();
+    state.dayT = (now.getHours() * 3600 + now.getMinutes() * 60 + now.getSeconds()) / 86400;
+  } else state.dayT = (state.dayT + dt / 240) % 1;   /* demo: a four-minute day, slow enough to savor dusk */
+  const nt = nightness(state.dayT);
+
+  /* sky gradient + fog */
+  const [top, bot] = skyStops(state.dayT);
+  const grad = skyCtx.createLinearGradient(0, 0, 0, 256);
+  grad.addColorStop(0, `rgb(${top.map(v => v | 0).join(',')})`);
+  grad.addColorStop(1, `rgb(${bot.map(v => v | 0).join(',')})`);
+  skyCtx.fillStyle = grad;
+  skyCtx.fillRect(0, 0, 2, 256);
+  skyTex.needsUpdate = true;
+  scene.fog.color.setRGB(bot[0] / 255, bot[1] / 255, bot[2] / 255);
+  starMat.opacity = nt * .9;
+
+  /* sun path */
+  const sa = (state.dayT - .25) * Math.PI * 2;
+  const sunI = Math.max(0, Math.sin(sa));
+  sun.position.set(Math.cos(sa) * 120, Math.max(8, Math.sin(sa) * 140), 60);
+  sun.intensity = .15 + sunI * 1.15;
+  sun.color.setHSL(.09, .5, .62 + sunI * .3);
+  hemi.intensity = .18 + (1 - nt) * .42;
+  renderer.toneMappingExposure = .92 + (1 - nt) * .18;
+
+  /* lamps breathe on at night; windows warm up with them */
+  for (const b of lampGlows) b.material.color.setHSL(.11, 1, .45 + nt * .35);
+  for (const l of lampLights) l.intensity = nt * 2.4;
+  for (const w of windowGlows) w.mat.color.lerpColors(w.day, w.night, nt);
+
+  /* water drift + falls scroll */
+  for (const w of waters) w.material.map.offset.x = t * .008;
+  fallsTex.offset.y = -t * .9;
+  blades.rotation.z = t * .7;
+  boat.position.y = .1 + Math.sin(t * 1.1) * .07;
+  boat.rotation.z = Math.sin(t * .9) * .04;
+
+  /* tour */
+  if (state.tour && !tween) {
+    tourHold -= dt;
+    if (tourHold <= 0) {
+      tourIdx = (tourIdx + 1) % (districts.length + 1);
+      flyTo(tourIdx === districts.length ? OVERVIEW : districts[tourIdx], 6.5);
+    }
+  }
+  if (tween) {
+    tween.t += dt;
+    const u = Math.min(1, tween.t / tween.dur);
+    const s = u * u * (3 - 2 * u);
+    controls.target.lerpVectors(tween.fromT, tween.toT, s);
+    camera.position.lerpVectors(tween.fromP, tween.toP, s);
+    if (u >= 1) tween = null;
+  }
+  controls.update();
+
+  /* births rise from the ward to the tree */
+  for (let i = births.length - 1; i >= 0; i--) {
+    const b = births[i];
+    b.t += dt / 7;
+    if (b.t >= 1) { world.remove(b.m); births.splice(i, 1); continue; }
+    const e = b.t * b.t * (3 - 2 * b.t);
+    b.m.position.lerpVectors(WARD, TREE, e);
+    b.m.position.y += Math.sin(b.t * Math.PI) * 6;
+    b.m.material.opacity = Math.min(1, (1 - b.t) * 3);
+  }
+
+  /* citizens live their errands */
+  for (const c of citizens) {
+    if (c.pause > 0) {
+      c.pause -= dt;
+      if (c.pause <= 0) retarget(c);
+    } else if (c.route.length) {
+      const w = c.route[0];
+      const dx = w.x - c.x, dz = w.z - c.z;
+      const d = Math.hypot(dx, dz);
+      if (d < .6) {
+        c.route.shift();
+        if (!c.route.length) c.pause = 3 + Math.random() * 5;
+      } else {
+        c.x += dx / d * c.spd * dt;
+        c.z += dz / d * c.spd * dt;
+        c.mesh.rotation.y = Math.atan2(dx, dz);
+      }
+    } else retarget(c);
+    const bob = c.pause > 0 ? 0 : Math.abs(Math.sin(t * 6 * c.spd + c.ph)) * .08;
+    c.mesh.position.set(c.x, terrainH(c.x, c.z) + bob, c.z);
+  }
+
+  renderer.render(scene, camera);
+  requestAnimationFrame(animate);
+}
+animate();
+</script>
+<script>
+/* Postcard edition — snapshot of July 19, 2026. No live wire: the city keeps its own counsel. */
+addEventListener('load', () => setCitizens(7));
+</script>
+</body>
+</html>
