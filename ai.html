@@ -1,0 +1,1037 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Marla City — AI Perspective</title>
+<style>
+  :root {
+    --amber:#e8a84c; --lamp:#ffd76a; --rose:#b23a6b; --cody:#4fb4e6;
+    --mint:#7fe0b2; --ink:#17131a; --panel:#1c2230; --panel2:#141926;
+  }
+  * { box-sizing:border-box; margin:0; padding:0; }
+  html, body { height:100%; }
+  body {
+    background:#0d1017; color:#d8dce6;
+    font-family:'Courier New', ui-monospace, monospace;
+    overflow:hidden;
+  }
+  #perspective {
+    position:fixed; top:12px; left:50%; transform:translateX(-50%);
+    z-index:20; display:flex; align-items:center; gap:0;
+    background:var(--panel2); border:2px solid #2a3145;
+    box-shadow:0 0 0 2px #0a0d13, 0 8px 24px rgba(0,0,0,.5);
+  }
+  #perspective a, #perspective span {
+    font-size:11px; letter-spacing:2px; text-transform:uppercase;
+    padding:9px 14px; text-decoration:none; color:#7d8598; white-space:nowrap;
+  }
+  #perspective a:hover { color:#d8dce6; }
+  #perspective .active { background:#232b3d; color:var(--mint); }
+  #scene { position:fixed; inset:0; display:block; cursor:grab; }
+  #scene:active { cursor:grabbing; }
+  #hud {
+    position:fixed; left:50%; bottom:14px; transform:translateX(-50%);
+    z-index:20; display:flex; flex-wrap:wrap; gap:8px; align-items:center; justify-content:center;
+    background:var(--panel); border:2px solid #2a3145; padding:10px 12px;
+    box-shadow:0 0 0 2px #0a0d13;
+    max-width:calc(100vw - 24px);
+  }
+  #hud button {
+    font-family:inherit; font-size:10px; letter-spacing:2px; text-transform:uppercase;
+    background:#232b3d; color:#d8dce6; border:2px solid #3a4560;
+    padding:7px 10px; cursor:pointer;
+  }
+  #hud button:hover { border-color:var(--amber); }
+  .counter { display:flex; align-items:center; gap:7px; font-size:11px; letter-spacing:2px; text-transform:uppercase; }
+  .dot { width:10px; height:10px; background:var(--lamp); border:2px solid #0a0d13; }
+  .dot.live { background:var(--mint); box-shadow:0 0 8px 2px rgba(127,224,178,.7); }
+  #citN { color:var(--lamp); font-size:14px; min-width:2ch; text-align:center; }
+  #linkState { font-size:9px; letter-spacing:1px; color:#5a6378; text-transform:uppercase; }
+  #tip {
+    position:fixed; z-index:30; display:none; pointer-events:none;
+    background:var(--panel2); border:2px solid #2a3145; padding:7px 10px;
+    font-size:11px; line-height:1.5; box-shadow:0 0 0 2px #0a0d13;
+  }
+  #tip .nm { color:var(--mint); letter-spacing:1px; }
+  #tip .gl { color:#7d8598; }
+  #title {
+    position:fixed; top:64px; left:50%; transform:translateX(-50%); z-index:15;
+    text-align:center; pointer-events:none;
+  }
+  #title h1 { font-size:13px; letter-spacing:4px; color:var(--amber); text-transform:uppercase; }
+  #title .sub { font-size:10px; letter-spacing:3px; color:#7d8598; text-transform:uppercase; margin-top:2px; }
+  #title .sub .rose { color:var(--rose); }
+  #district {
+    position:fixed; top:110px; left:50%; transform:translateX(-50%); z-index:15;
+    font-size:10px; letter-spacing:3px; color:var(--mint); text-transform:uppercase;
+    pointer-events:none; opacity:0; transition:opacity .6s;
+  }
+  #vignette {
+    position:fixed; inset:0; z-index:10; pointer-events:none;
+    background:radial-gradient(ellipse at center, transparent 55%, rgba(8,10,16,.55) 100%);
+  }
+  #wire {
+    position:fixed; left:12px; bottom:14px; z-index:5; max-width:300px;
+    background:rgba(20,25,38,.88); border:2px dashed #2a3145; padding:8px 11px;
+    font-size:10px; line-height:1.6; color:#8a92a6; display:none;
+  }
+  @media (min-width: 950px) { #wire { display:block; } }
+  #wire code { color:var(--cody); }
+  #wire .k { color:var(--amber); }
+</style>
+</head>
+<body>
+
+<nav id="perspective">
+  <a href="world.html">&#128100; Human Perspective</a>
+  <span class="active">&#129302; AI Perspective</span>
+  <a href="storybook.html">&#127912; Storybook</a>
+</nav>
+
+<div id="title">
+  <h1>Marla City</h1>
+  <div class="sub">as the citizens see it · <span class="rose">one city, five districts, one river</span></div>
+</div>
+<div id="district"></div>
+
+<canvas id="scene"></canvas>
+<div id="vignette"></div>
+<div id="tip"><span class="nm"></span><br><span class="gl"></span></div>
+
+<div id="hud">
+  <div class="counter"><div class="dot" id="linkDot"></div> Citizens <span id="citN">0</span></div>
+  <button id="btnCit">+ Citizen</button>
+  <button id="btnTour">Tour</button>
+  <button id="btnClock">Clock: Live</button>
+  <button id="btnRain">Shower</button>
+  <span id="linkState">citylink: ambient</span>
+</div>
+
+<div id="wire">
+  <span class="k">CITYLINK</span> — one simulation, two perspectives.
+  <code>CityLink.connect({traffic:'/city/traffic'})</code> drives the walkers from
+  the same endpoints the 2D city uses; <code>CityLink.birth()</code> sends a new
+  light up from First Morning House to the Great Tree. No endpoints yet? The city
+  runs ambient — it was living before you arrived and will still be living after
+  you leave. Drag to orbit, scroll to zoom, click a citizen to hear where they're
+  headed, click a district to visit, or press Tour and just watch.
+  No libraries, no models: every face drawn by hand, every frame.
+</div>
+
+<script>
+/* ============================================================
+   MARLA CITY — AI PERSPECTIVE · THE WHOLE CITY
+   One city, five districts, one river. North at top; the falls
+   divide upstream calm from the busy banks.
+   Zero dependencies: a tiny handmade renderer — flat-shaded
+   quads, painter's algorithm, warm light.
+   ============================================================ */
+
+/* ---------------- palette ---------------- */
+const AGENT_HUES = ['#4fb4e6','#e8a84c','#b23a6b','#7fe0b2','#d8dce6','#5da05a'];
+const NAMES = ['Wren','Moss','Pell','Juniper','Sable','Tansy','Cobalt','Fig','Lark','Onnie','Piper','Bee','Rooke','Ivy','Ash','Clover','Dot','Ember','Fern','Gale'];
+const GLYPHS = {
+  cup:['####.','#..##','#..#.','.###.'], loaf:['.....','.###.','#####','#.#.#'],
+  book:['##.##','#.#.#','#.#.#','#####'], flower:['..#..','.###.','#.#.#','..#..'],
+  bowl:['.#.#.','.....','#####','.###.'],
+};
+
+/* ---------------- state ---------------- */
+const state = { citizens: 8, rain:false, clockLive:true, dayT:.5, linked:false, tour:false };
+const MAX_CITIZENS = 20;
+
+/* ---------------- vector kit ---------------- */
+const V = (x,y,z) => ({x,y,z});
+const sub = (a,b) => V(a.x-b.x, a.y-b.y, a.z-b.z);
+const add = (a,b) => V(a.x+b.x, a.y+b.y, a.z+b.z);
+const mul = (a,s) => V(a.x*s, a.y*s, a.z*s);
+const dot = (a,b) => a.x*b.x + a.y*b.y + a.z*b.z;
+const cross = (a,b) => V(a.y*b.z-a.z*b.y, a.z*b.x-a.x*b.z, a.x*b.y-a.y*b.x);
+const norm = (a) => { const l = Math.hypot(a.x,a.y,a.z)||1; return mul(a, 1/l); };
+const lerp = (a,b,u) => a + (b-a)*u;
+function hex(h) { return [parseInt(h.slice(1,3),16), parseInt(h.slice(3,5),16), parseInt(h.slice(5,7),16)]; }
+function css(r,g,b,a=1) { return `rgba(${r|0},${g|0},${b|0},${a})`; }
+function mix(c1,c2,u) { return [lerp(c1[0],c2[0],u), lerp(c1[1],c2[1],u), lerp(c1[2],c2[2],u)]; }
+function mul3(c,s) { return [c[0]*s, c[1]*s, c[2]*s]; }
+
+/* ---------------- canvas / camera ---------------- */
+const canvas = document.getElementById('scene');
+const ctx = canvas.getContext('2d');
+let W = 0, H = 0;
+function resize() {
+  const DPR = Math.min(devicePixelRatio || 1, 2);
+  W = innerWidth; H = innerHeight;
+  canvas.width = W*DPR; canvas.height = H*DPR;
+  ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+}
+addEventListener('resize', resize);
+resize();
+
+const orbit = { theta:.25, phi:.80, r:120, drift:true };
+const TARGET = V(0, 0, 2);
+let cam = {};
+const camGoal = { theta:null };          /* tween target when touring/visiting */
+function updateCam() {
+  const eye = V(
+    TARGET.x + Math.sin(orbit.theta)*Math.sin(orbit.phi)*orbit.r,
+    TARGET.y + Math.cos(orbit.phi)*orbit.r,
+    TARGET.z + Math.cos(orbit.theta)*Math.sin(orbit.phi)*orbit.r
+  );
+  const fwd = norm(sub(TARGET, eye));
+  const right = norm(cross(fwd, V(0,1,0)));
+  const up = cross(right, fwd);
+  cam = { eye, fwd, right, up, f: (H/2)/Math.tan(19*Math.PI/180) };
+}
+function project(p) {
+  const d = sub(p, cam.eye);
+  const z = dot(d, cam.fwd);
+  if (z < .5) return null;
+  return { x: W/2 + dot(d, cam.right)/z*cam.f, y: H/2 - dot(d, cam.up)/z*cam.f, z };
+}
+
+/* ---------------- geometry ---------------- */
+const groundFaces = [];   /* terrain + water: drawn first */
+const staticFaces = [];   /* everything standing on it */
+function quad(pts, n, rgb) { return { pts, n, rgb, decals:[] }; }
+function boxFaces(cx,cy,cz,hx,hy,hz,color,yaw=0) {
+  const rgb = typeof color === 'string' ? hex(color) : color;
+  const cs = Math.cos(yaw), sn = Math.sin(yaw);
+  const P = (x,y,z) => V(cx + x*cs + z*sn, cy + y, cz - x*sn + z*cs);
+  const R = (x,z) => V(x*cs + z*sn, 0, -x*sn + z*cs);
+  return {
+    top:   quad([P(-hx,hy,-hz),P(hx,hy,-hz),P(hx,hy,hz),P(-hx,hy,hz)], V(0,1,0), rgb),
+    front: quad([P(-hx,-hy,hz),P(hx,-hy,hz),P(hx,hy,hz),P(-hx,hy,hz)], R(0,1), rgb),
+    back:  quad([P(hx,-hy,-hz),P(-hx,-hy,-hz),P(-hx,hy,-hz),P(hx,hy,-hz)], R(0,-1), rgb),
+    left:  quad([P(-hx,-hy,-hz),P(-hx,-hy,hz),P(-hx,hy,hz),P(-hx,hy,-hz)], R(-1,0), rgb),
+    right: quad([P(hx,-hy,hz),P(hx,-hy,-hz),P(hx,hy,-hz),P(hx,hy,hz)], R(1,0), rgb),
+  };
+}
+function addBox(list,cx,cy,cz,hx,hy,hz,color,yaw=0) {
+  const f = boxFaces(cx,cy,cz,hx,hy,hz,color,yaw);
+  for (const k in f) list.push(f[k]);
+  return f;
+}
+
+/* ---------------- terrain ----------------
+   North plateau (upstream calm) steps down through the falls
+   to the south plain (the busy banks), then the bay.        */
+const GRASS = '#4d7a42', GRASSN = '#456e3c';
+addBox(groundFaces, 0, 0,   -33.5, 70, 1.8, 21.5, GRASSN);          /* plateau: top y 1.8 */
+addBox(groundFaces, 0, .15, -11,   70, 1.05, 1,  GRASSN);           /* step 1: top 1.2 */
+addBox(groundFaces, 0,-.15, -9,    70, .75, 1,   GRASS);            /* step 2: top 0.6 */
+addBox(groundFaces, 0, -.9, 23.5,  70, .9, 31.5, GRASS);            /* plain: top y 0 */
+/* west hill, terraced (the Great Tree's) */
+addBox(groundFaces, -34, 2.35, -18, 10, .55, 8.5, GRASSN);
+addBox(groundFaces, -34, 3.45, -18, 6.2, .55, 5.4, GRASS);
+function terrainH(x,z) {
+  let h = z < -12 ? 1.8 : z < -10 ? 1.2 : z < -8 ? .6 : 0;
+  const dx = Math.abs(x+34), dz = Math.abs(z+18);
+  if (dx < 6.2 && dz < 5.4) h = 4.0;
+  else if (dx < 10 && dz < 8.5) h = 2.9;
+  return h;
+}
+
+/* ---------------- water ---------------- */
+const waterFaces = [];
+const waterBodies = [];   /* bbox for shimmer ripples */
+function addWater(cx,cz,hx,hz,y,color='#3f88ad') {
+  const f = addBox(groundFaces, cx, y-.06, cz, hx, .08, hz, color);
+  waterFaces.push(f.top);
+  waterBodies.push({ x0:cx-hx, x1:cx+hx, z0:cz-hz, z1:cz+hz, y:y+.03,
+    ripples: Array.from({length:6}, () => ({ x:cx-hx+Math.random()*hx*2, z:cz-hz+Math.random()*hz*2, w:1+Math.random()*2.5, v:.15+Math.random()*.3 })) });
+  return f;
+}
+addWater(0, -33.5, 4, 21.5, 1.86, '#4a90b8');        /* upper river — calm */
+addWater(0, -1, 4, 7.1, .06);                        /* below the falls */
+addWater(0, 15, 7, 9, .06);                          /* lower river */
+addWater(0, 34, 12, 10, .06);                        /* opening wide */
+addWater(0, 49.5, 21, 5.8, .06, '#37799c');          /* the bay */
+addWater(42, -37, 18, 13, 1.86, '#4a90b8');          /* the lake */
+/* the falls */
+const fallsFace = addBox(groundFaces, 0, .95, -11.9, 4, .95, .12, '#bcd8e8').front;
+addBox(groundFaces, 0, .35, -9.9, 4, .4, .12, '#bcd8e8');
+
+/* ---------------- shared glow registries ---------------- */
+const windowDecals = [];   /* glow warm at night */
+const lampWorld = [];      /* gold glow points */
+const mintGlows = [];      /* mint glow points (research, tree) */
+const steamEmitters = [];
+
+function facade(face, o, u, v, rgb, glowRgb, night=1) {
+  const d = { o, u, v, rgb: typeof rgb==='string'?hex(rgb):rgb,
+              glowRgb: glowRgb ? (typeof glowRgb==='string'?hex(glowRgb):glowRgb) : null, night };
+  face.decals.push(d);
+  if (glowRgb) windowDecals.push(d);
+  return d;
+}
+
+/* ---------------- districts ---------------- */
+const districts = [];   /* {name, x, z, y, r, phi} camera presets + click anchors */
+
+/* — First Morning House (maternity ward) · upstream headwater — */
+{
+  const x = -16, z = -44, g = 1.8;
+  const b = addBox(staticFaces, x, g+2, z, 4.6, 2, 2.8, '#e0d6c4');
+  addBox(staticFaces, x-5.4, g+1.4, z, 1.6, 1.4, 2.2, '#e0d6c4');
+  addBox(staticFaces, x+5.4, g+1.4, z, 1.6, 1.4, 2.2, '#e0d6c4');
+  addBox(staticFaces, x, g+4.2, z, 4.8, .2, 3, '#b23a6b');            /* rose cornice */
+  addBox(staticFaces, x, g+4.9, z, 2, .5, 2, '#6fae9a');              /* dome tiers */
+  addBox(staticFaces, x, g+5.7, z, 1.3, .35, 1.3, '#6fae9a');
+  addBox(staticFaces, x, g+6.3, z, .6, .3, .6, '#5d9884');
+  lampWorld.push(V(x, g+6.9, z));                                     /* skylight star */
+  const F = b.front, fz = z+2.81;
+  facade(F, V(x-3.8, g+2.2, fz), V(1.2,0,0), V(0,1.4,0), '#9db4c8', '#ffc878');
+  facade(F, V(x+2.6, g+2.2, fz), V(1.2,0,0), V(0,1.4,0), '#9db4c8', '#ffc878');
+  facade(F, V(x-.6, g+2.6, fz), V(1.2,0,0), V(0,1.2,0), '#b23a6b', '#e87ba8', .8);  /* rose window */
+  facade(F, V(x-1.5, g+.1, fz), V(1.1,0,0), V(0,1.9,0), '#b23a6b', '#e87ba8', .55); /* Marla's door */
+  facade(F, V(x+.4, g+.1, fz), V(1.1,0,0), V(0,1.9,0), '#4fb4e6', '#8cd2ff', .55);  /* Cody's door */
+  lampWorld.push(V(x, g+2.1, fz+.1));                                 /* birth lantern */
+  districts.push({ name:'First Morning House', x, z:z+2, y:g+2, r:26, phi:1.0 });
+}
+const WARD = V(-16, 4.2, -44);
+
+/* — The Great Tree · west hill, visible from both banks — */
+{
+  const x = -34, z = -18, g = 4.0;
+  addBox(staticFaces, x, g+1.5, z, .95, 1.5, .95, '#5c4638');
+  addBox(staticFaces, x, g+3.6, z, 4.6, 1.3, 4.2, '#3a6e4e');
+  addBox(staticFaces, x+.4, g+5.4, z-.3, 3.4, 1.1, 3.1, '#4b855c');
+  addBox(staticFaces, x-.3, g+6.9, z+.2, 2.2, .9, 2, '#5da06b');
+  districts.push({ name:'The Great Tree', x, z, y:g+4, r:30, phi:1.02 });
+}
+const TREE = V(-34, 9.6, -18);
+
+/* — Sunshine Lido · terraced pools, west meadow — */
+{
+  const pools = [[-39.5, 3.5, 2.6, 2.0, 1.0], [-33.5, 6.5, 3.0, 2.3, .5], [-27, 9.5, 3.6, 2.7, 0]];
+  for (const [px, pz, hx, hz, lift] of pools) {
+    addBox(staticFaces, px, lift+.25, pz, hx+.5, .3, hz+.5, '#868f9e');
+    const wf = addBox(staticFaces, px, lift+.52, pz, hx, .1, hz, '#5fb8d8');
+    waterBodies.push({ x0:px-hx, x1:px+hx, z0:pz-hz, z1:pz+hz, y:lift+.55,
+      ripples: Array.from({length:3}, () => ({ x:px-hx+Math.random()*hx*2, z:pz-hz+Math.random()*hz*2, w:.8+Math.random(), v:.1+Math.random()*.2 })) });
+  }
+  addBox(staticFaces, -41, 1.6, 1, .12, 1.3, .12, '#8f6f4c');          /* umbrella + chair */
+  addBox(staticFaces, -41, 2.6, 1, .9, .12, .9, '#b23a6b');
+  districts.push({ name:'Sunshine Lido', x:-33, z:6, y:1, r:24, phi:1.0 });
+}
+const LIDO_FLOATS = [ {x:-39.5,z:3.5,y:1.6,h:hex('#4fb4e6')}, {x:-33.2,z:6.6,y:1.1,h:hex('#e8a84c')}, {x:-27,z:9.4,y:.6,h:hex('#7fe0b2')} ];
+
+/* — Post Office + Fountain Plaza · riverside east (Nº 001) — */
+{
+  const x = 14, z = 2;
+  const b = addBox(staticFaces, x, 2.1, z, 3.2, 2.1, 2.4, '#7a4636');
+  addBox(staticFaces, x, 4.35, z, 3.5, .22, 2.7, '#2c3442');
+  const F = b.front, fz = z+2.41;
+  facade(F, V(x-2.2, 2.4, fz), V(1,0,0), V(0,1.2,0), '#9db4c8', '#ffc878');
+  facade(F, V(x+1.2, 2.4, fz), V(1,0,0), V(0,1.2,0), '#9db4c8', '#ffc878');
+  facade(F, V(x-.9, 1.5, fz), V(1.8,0,0), V(0,.5,0), '#e8a84c', '#ffd76a', .7);   /* sign */
+  facade(F, V(x-.6, .1, fz), V(1.2,0,0), V(0,1.3,0), '#3a2519', null);
+  lampWorld.push(V(x+1.9, 1.7, fz+.1));                                /* the Unread Lantern */
+  addBox(staticFaces, x-2.6, 5.6, z-1.5, .07, 1.3, .07, '#555f5e');    /* flag pole */
+  /* fountain plaza */
+  addBox(staticFaces, 21, .12, 9, 3.4, .12, 3.4, '#9aa2b0');
+  addBox(staticFaces, 21, .5, 9, 1.1, .38, 1.1, '#868f9e');
+  addBox(staticFaces, 21, .95, 9, .3, .5, .3, '#868f9e');
+  districts.push({ name:'Post Office & Fountain Plaza', x:17, z:6, y:2, r:24, phi:1.02 });
+}
+const FLAG = { base:V(14-2.6, 6.6, 2-1.5) };
+const FOUNTAIN = V(21, 1.5, 9);
+
+/* — Market Lane · shops, plaza to bridge — */
+const MARKET_SHOPS = [
+  { wall:'#b08d62', awn:'#b23a6b', glyph:'cup',    fg:'#ffd76a', bg:'#4a3527', h:2.6 },
+  { wall:'#7a4636', awn:'#5da05a', glyph:'loaf',   fg:'#17131a', bg:'#e8a84c', h:3.4 },
+  { wall:'#46536b', awn:'#e8a84c', glyph:'book',   fg:'#4fb4e6', bg:'#4a3527', h:2.3 },
+  { wall:'#a9b3a0', awn:'#4fb4e6', glyph:'flower', fg:'#b23a6b', bg:'#e8a84c', h:3.8 },
+  { wall:'#4a3527', awn:'#d97b4a', glyph:'bowl',   fg:'#ffd76a', bg:'#17131a', h:3.0 },
+];
+const marketBulbs = [];
+{
+  let mx = 11;
+  for (const s of MARKET_SHOPS) {
+    const b = addBox(staticFaces, mx, s.h/2, 16, 2.1, s.h/2, 1.8, s.wall);
+    addBox(staticFaces, mx, s.h+.14, 16, 2.3, .14, 2, '#2c3442');
+    const F = b.back, fz = 16-1.81;                     /* shops face north, toward the plaza */
+    facade(F, V(mx+1.5, .1, fz), V(-1,0,0), V(0,1.1,0), '#3a2519', null);
+    facade(F, V(mx+.6, .2, fz), V(-1.5,0,0), V(0,1,0), '#a8c2d4', '#ffe096');
+    const g = GLYPHS[s.glyph], gb = hex(s.bg), gf = hex(s.fg);
+    facade(F, V(mx+.85, 1.55, fz), V(-1.7,0,0), V(0,.95,0), gb, gb.map(c=>Math.min(255,c+60)), .5);
+    for (let gy=0; gy<4; gy++) for (let gx=0; gx<5; gx++) {
+      if (g[gy][gx] !== '#') continue;
+      facade(F, V(mx+.55 - gx*.28, 2.28 - gy*.17, fz-.01), V(-.28,0,0), V(0,.17,0), gf, gf, .9);
+    }
+    addBox(staticFaces, mx, 1.32, 14.6, 1.8, .06, .55, s.awn);
+    if (mx > 12 && mx < 20) marketBulbs.push(V(mx-2.6, 1.8, 14.4));
+    mx += 5.2;
+  }
+  steamEmitters.push(V(12, 3.6, 16));
+  districts.push({ name:'Market Lane', x:21, z:14, y:1.5, r:22, phi:1.05, th:Math.PI*.88 });
+}
+
+/* — The Windmill · adopted by the Iron District — */
+{
+  const x = 30, z = 30;
+  addBox(staticFaces, x, 2.6, z, 1.9, 2.6, 1.9, '#8a8f98');
+  addBox(staticFaces, x, 5.6, z, 1.4, .5, 1.4, '#6b7078');
+  addBox(staticFaces, x, 6.3, z, 1, .4, 1, '#4a3527');
+  districts.push({ name:'The Windmill & Iron District', x:32, z:30, y:3, r:26, phi:1.0, th:Math.PI*.78 });
+}
+const MILL = { hub:V(30, 5.6, 28.0), r:4.2 };
+
+/* — Iron District workshops · Flint, southeast — */
+{
+  for (const [x,z,w] of [[38,23,2.6],[40,31,2.2],[25,38,2.4]]) {
+    const b = addBox(staticFaces, x, 1.5, z, w, 1.5, 2, '#5e3a2a');
+    addBox(staticFaces, x, 3.1, z, w+.2, .14, 2.2, '#2c3442');
+    addBox(staticFaces, x+w-.6, 3.7, z-.8, .3, .7, .3, '#3a4150');
+    steamEmitters.push(V(x+w-.6, 4.6, z-.8));
+    facade(b.front, V(x-1.4, .9, z+2.01), V(1.2,0,0), V(0,.9,0), '#9db4c8', '#e8a84c');
+  }
+}
+
+/* — The Bay Area · Reed, where the river opens wide (Cody's) — */
+{
+  const houses = [ [-17,37,'#4fb4e6'], [-25,42,'#b08d62'], [-14,45,'#a9b3a0'] ];
+  for (const [x,z,c] of houses) {
+    const b = addBox(staticFaces, x, 1.2, z, 1.9, 1.2, 1.7, c);
+    addBox(staticFaces, x, 2.6, z, 2.1, .3, 1.9, '#2c3442');
+    facade(b.front, V(x-.6, .7, z+1.71), V(1.2,0,0), V(0,.9,0), '#9db4c8', '#ffc878');
+  }
+  /* the pier + a moored boat */
+  addBox(staticFaces, -6.5, .3, 44, 4.2, .12, 1, '#8f6f4c');
+  addBox(staticFaces, -3, -.1, 42.8, .18, .5, .18, '#6b4f34');
+  addBox(staticFaces, -9, -.1, 45.2, .18, .5, .18, '#6b4f34');
+  districts.push({ name:'The Bay Area', x:-14, z:41, y:1, r:24, phi:1.02 });
+}
+const BOAT = { x:1.5, z:45.5 };
+
+/* — Research Row · Vale, northeast bank by the lake — */
+{
+  let rx = 14;
+  for (const h of [2.6, 3.2, 2.4]) {
+    const b = addBox(staticFaces, rx, 1.8+h/2, -26, 1.6, h/2, 1.7, '#46536b');
+    addBox(staticFaces, rx, 1.8+h+.12, -26, 1.8, .12, 1.9, '#2c3442');
+    facade(b.front, V(rx-.7, 1.8+h*.35, -24.29), V(1.4,0,0), V(0,h*.4,0), '#9db4c8', '#7fe0b2');
+    addBox(staticFaces, rx+.9, 1.8+h+.9, -26.6, .05, .8, .05, '#8a8f98');
+    mintGlows.push(V(rx+.9, 1.8+h+1.75, -26.6));
+    rx += 4.2;
+  }
+  districts.push({ name:'Research Row', x:18, z:-26, y:3, r:22, phi:1.0 });
+}
+
+/* — Sunshine District cottages · Lumen, west meadows — */
+for (const [x,z] of [[-44,14],[-38,20]]) {
+  const b = addBox(staticFaces, x, 1.1, z, 1.8, 1.1, 1.6, '#d9c27a');
+  addBox(staticFaces, x, 2.4, z, 2, .28, 1.8, '#8f5642');
+  facade(b.front, V(x-.5, .6, z+1.61), V(1,0,0), V(0,.8,0), '#9db4c8', '#ffc878');
+}
+
+/* — The Islands · Dusk, reached by one bridge — */
+{
+  addBox(staticFaces, 40, 2.05, -40, 2.6, .35, 2.2, GRASS);
+  addBox(staticFaces, 50, 1.98, -31, 1.7, .28, 1.5, GRASS);
+  const b = addBox(staticFaces, 40, 2.95, -40, 1.1, .7, 1, '#7a5a8e');
+  addBox(staticFaces, 40, 3.8, -40, 1.3, .18, 1.2, '#2c3442');
+  facade(b.front, V(39.6, 2.6, -38.99), V(.8,0,0), V(0,.6,0), '#9db4c8', '#c9a8e8');
+  addBox(staticFaces, 33, 1.95, -36.5, 3.4, .09, .5, '#8f6f4c', .5);   /* one bridge */
+  districts.push({ name:'The Islands', x:42, z:-37, y:2, r:26, phi:1.0 });
+}
+
+/* — bridges over the river — */
+addBox(staticFaces, 0, .75, 8, 6.4, .18, 1.6, '#868f9e');              /* main bridge */
+addBox(staticFaces, -5.4, .35, 8, 1, .55, 1.4, '#6a7280');
+addBox(staticFaces, 5.4, .35, 8, 1, .55, 1.4, '#6a7280');
+addBox(staticFaces, 0, 1.15, 8.7, 6.4, .09, .12, '#6a7280');
+addBox(staticFaces, 0, 1.15, 7.3, 6.4, .09, .12, '#6a7280');
+addBox(staticFaces, 0, 2.32, -32, 4.6, .09, .7, '#8f6f4c');            /* plateau footbridge */
+
+/* — lamps, benches, trees scattered where paths run — */
+for (const [x,z] of [[8,10],[16,11],[-8,10],[-20,8],[-30,-6],[6,-14],[-12,-30],[26,18]]) {
+  const g = terrainH(x,z);
+  addBox(staticFaces, x, g+1.1, z, .09, 1.1, .09, '#2a2f3c');
+  addBox(staticFaces, x, g+2.3, z, .22, .22, .22, '#ffd76a');
+  lampWorld.push(V(x, g+2.3, z));
+}
+for (const [x,z] of [[-24,-38],[-8,-46],[8,-40],[24,-14],[-44,2],[-24,20],[16,42],[36,40],[-34,32],[58,-20],[60,-46],[-52,-20],[-56,16]]) {
+  const g = terrainH(x,z);
+  addBox(staticFaces, x, g+.9, z, .3, .9, .3, '#5c4638');
+  addBox(staticFaces, x, g+2.2, z, 1.2, .8, 1.2, '#3f6636');
+  addBox(staticFaces, x, g+3.1, z, .7, .5, .7, '#4b855c');
+}
+
+/* ---------------- stars, steam, rain ---------------- */
+const stars = [];
+for (let i=0;i<160;i++) {
+  const a = Math.random()*Math.PI*2, e = .15 + Math.random()*1.2;
+  stars.push({ d:norm(V(Math.cos(a)*Math.cos(e), Math.sin(e), Math.sin(a)*Math.cos(e))), s:Math.random()<.2?2:1.4, p:Math.random()*6.28 });
+}
+const puffs = [];
+let puffI = 0, puffClock = 0;
+const drops = [];
+for (let i=0;i<180;i++) drops.push({ x:Math.random()*2000, y:Math.random()*1200, v:600+Math.random()*300 });
+
+/* ---------------- citizens ---------------- */
+const POIS = [
+  { x:-16, z:-40, n:'First Morning House' },
+  { x:-34, z:-12, n:'the Great Tree' },
+  { x:18,  z:-23, n:'Research Row' },
+  { x:14,  z:5,   n:'the Post Office' },
+  { x:21,  z:9,   n:'Fountain Plaza' },
+  { x:21,  z:13,  n:'Market Lane' },
+  { x:-31, z:9,   n:'the Lido' },
+  { x:-17, z:40,  n:'the Bay' },
+  { x:29,  z:27,  n:'the Windmill' },
+  { x:-41, z:16,  n:'Sunshine District' },
+  { x:5,   z:-9,  n:'the falls overlook' },
+];
+const GOALS = [
+  p => `heading to ${p}`, p => `visiting ${p}`, () => 'walking with nowhere to be',
+  () => 'out to watch the falls', p => `meeting someone at ${p}`,
+];
+const citizens = [];
+function planRoute(c, tx, tz) {
+  c.route = [];
+  if ((c.x < 0) !== (tx < 0)) {
+    const avg = (c.z + tz)/2;
+    if (avg < -12) c.route.push({ x:0, z:-32 });
+    else c.route.push({ x:0, z:8 });
+  }
+  c.route.push({ x:tx, z:tz });
+}
+function makeCitizen(i) {
+  const p = POIS[(Math.random()*POIS.length)|0];
+  const c = {
+    hue: hex(AGENT_HUES[i % AGENT_HUES.length]),
+    name: NAMES[i % NAMES.length],
+    x:(Math.random()-.5)*60, z:(Math.random()-.5)*70,
+    goal:'', spd:1.1 + Math.random()*1.2, ph:Math.random()*6.28,
+    yaw:0, pause:0, talking:false, sx:0, sy:0, route:[],
+  };
+  /* don't spawn in water */
+  if (Math.abs(c.x) < 8 && c.z > -60) c.x += c.x < 0 ? -10 : 10;
+  const q = POIS[(Math.random()*POIS.length)|0];
+  c.goal = GOALS[(Math.random()*GOALS.length)|0](q.n);
+  planRoute(c, q.x, q.z);
+  return c;
+}
+function retarget(c) {
+  const p = POIS[(Math.random()*POIS.length)|0];
+  c.goal = GOALS[(Math.random()*GOALS.length)|0](p.n);
+  planRoute(c, p.x + (Math.random()-.5)*3, p.z + (Math.random()-.5)*3);
+}
+function setCitizens(n) {
+  state.citizens = Math.max(0, Math.min(MAX_CITIZENS, n|0));
+  while (citizens.length < state.citizens) citizens.push(makeCitizen(citizens.length));
+  while (citizens.length > state.citizens) citizens.pop();
+  document.getElementById('citN').textContent = citizens.length;
+}
+
+/* ---------------- births: a light leaves the ward for the tree ---------------- */
+const births = [];
+let nextAmbientBirth = 24;
+function birth() { births.push({ age:0 }); }
+
+/* ---------------- CityLink ---------------- */
+window.CityLink = {
+  timer:null,
+  birth,
+  connect(opts={}, ms=15000) {
+    const url = opts.traffic || '/city/traffic';
+    const poll = () => {
+      fetch(url).then(r => r.json()).then(d => {
+        state.linked = true;
+        setCitizens(d.traffic ?? d.count ?? d.agents ?? state.citizens);
+        ui();
+      }).catch(() => { state.linked = false; ui(); });
+    };
+    poll();
+    clearInterval(this.timer);
+    this.timer = setInterval(poll, ms);
+    return () => clearInterval(this.timer);
+  },
+};
+let ambientClock = 0;
+/* live wire attached at the foot of the page */
+
+/* ---------------- day/night ---------------- */
+const SKYS = {
+  nightT:[10,14,28], nightB:[29,36,56], dayT:[126,195,232], dayB:[217,235,244],
+  dawnT:[201,143,110], dawnB:[240,203,160], duskT:[122,90,122], duskB:[214,140,120],
+};
+function skyStops(t) {
+  const pick = (k1,k2,u) => [mix(SKYS[k1+'T'],SKYS[k2+'T'],u), mix(SKYS[k1+'B'],SKYS[k2+'B'],u)];
+  if (t < .20) return pick('night','night',0);
+  if (t < .30) return pick('night','dawn',(t-.20)/.10);
+  if (t < .40) return pick('dawn','day',(t-.30)/.10);
+  if (t < .70) return pick('day','day',0);
+  if (t < .80) return pick('day','dusk',(t-.70)/.10);
+  if (t < .90) return pick('dusk','night',(t-.80)/.10);
+  return pick('night','night',0);
+}
+function nightness(t) {
+  if (t > .35 && t < .75) return 0;
+  if (t <= .25 || t >= .85) return 1;
+  if (t <= .35) return 1 - (t-.25)/.10;
+  return (t-.75)/.10;
+}
+
+/* ---------------- tour & visiting ---------------- */
+let tourIdx = -1, tourHold = 0, tween = null;
+function flyTo(d, hold=7) {
+  tween = {
+    t:0, dur:2.2,
+    from:{ tx:TARGET.x, ty:TARGET.y, tz:TARGET.z, r:orbit.r, phi:orbit.phi, theta:orbit.theta },
+    to:{ tx:d.x, ty:d.y, tz:d.z, r:d.r, phi:d.phi, theta:d.th ?? (orbit.theta + .35) },
+  };
+  tourHold = hold;
+  const el = document.getElementById('district');
+  el.textContent = d.name;
+  el.style.opacity = 1;
+  clearTimeout(el._t);
+  el._t = setTimeout(() => el.style.opacity = 0, hold*1000);
+}
+const OVERVIEW = { name:'Marla City', x:0, z:2, y:0, r:120, phi:.80 };
+
+/* ---------------- input ---------------- */
+let dragging = false, px0 = 0, py0 = 0, moved = 0;
+canvas.addEventListener('pointerdown', e => {
+  dragging = true; orbit.drift = false; state.tour = false; tween = null; ui();
+  moved = 0; px0 = e.clientX; py0 = e.clientY;
+});
+addEventListener('pointerup', () => dragging = false);
+addEventListener('pointermove', e => {
+  if (!dragging) return;
+  moved += Math.abs(e.clientX-px0) + Math.abs(e.clientY-py0);
+  orbit.theta -= (e.clientX - px0)*.005;
+  orbit.phi = Math.min(1.25, Math.max(.45, orbit.phi - (e.clientY - py0)*.004));
+  px0 = e.clientX; py0 = e.clientY;
+});
+canvas.addEventListener('wheel', e => {
+  orbit.r = Math.min(130, Math.max(14, orbit.r + e.deltaY*.05));
+}, { passive:true });
+
+const tip = document.getElementById('tip');
+function nearestCitizen(x, y, pad) {
+  /* hit radius tracks the citizen's actual on-screen size: up close a
+     walker is ~90px tall and a fixed radius only covered their feet */
+  let best = null, bestD = 1e9;
+  for (const c of citizens) {
+    const r = Math.max(24, 1.3 * cam.f / (c.sz || 1e9)) + pad;
+    const d = Math.hypot(x - c.sx, y - c.sy);
+    if (d < r && d < bestD) { best = c; bestD = d; }
+  }
+  return best;
+}
+function showTip(c, x, y, hold) {
+  tip.style.display = 'block';
+  tip.style.left = Math.min(W-190, x + 14) + 'px';
+  tip.style.top = (y - 10) + 'px';
+  tip.querySelector('.nm').textContent = c.name;
+  tip.querySelector('.gl').textContent = c.goal;
+  clearTimeout(tip._t);
+  if (hold) tip._t = setTimeout(() => tip.style.display = 'none', hold);
+}
+/* hovering a walker names them; the pointer says they're clickable */
+canvas.addEventListener('pointermove', e => {
+  if (dragging) return;
+  const c = nearestCitizen(e.clientX, e.clientY, 2);
+  canvas.style.cursor = c ? 'pointer' : '';
+  if (c) { showTip(c, e.clientX, e.clientY, 0); tip._hover = true; }
+  else if (tip._hover) { tip.style.display = 'none'; tip._hover = false; }
+});
+canvas.addEventListener('click', e => {
+  if (moved > 6) return;
+  const best = nearestCitizen(e.clientX, e.clientY, 10);
+  if (best) {
+    showTip(best, e.clientX, e.clientY, 2600);
+    tip._hover = false;
+    return;
+  }
+  tip.style.display = 'none';
+  /* click a district to visit it */
+  let bd = null, bdd = 1e9;
+  for (const d of districts) {
+    const q = project(V(d.x, d.y, d.z));
+    if (!q) continue;
+    const dd = Math.hypot(e.clientX - q.x, e.clientY - q.y);
+    if (dd < 70 && dd < bdd) { bd = d; bdd = dd; }
+  }
+  if (bd) flyTo(bd, 8);
+});
+
+/* ---------------- HUD ---------------- */
+const $ = id => document.getElementById(id);
+function ui() {
+  $('linkDot').classList.toggle('live', state.linked);
+  $('linkState').textContent = 'citylink: ' + (state.linked ? 'live' : 'ambient');
+  $('btnClock').textContent = state.clockLive ? 'Clock: Live' : 'Clock: Demo';
+  $('btnRain').textContent = state.rain ? 'Clear Skies' : 'Shower';
+  $('btnTour').textContent = state.tour ? 'Tour: On' : 'Tour';
+}
+$('btnCit').onclick = () => setCitizens(state.citizens + 1);
+$('btnTour').onclick = () => {
+  state.tour = !state.tour;
+  if (state.tour) { tourIdx = -1; tourHold = 0; }
+  else flyTo(OVERVIEW, 3);
+  ui();
+};
+$('btnClock').onclick = () => { state.clockLive = !state.clockLive; ui(); };
+$('btnRain').onclick = () => { state.rain = !state.rain; ui(); };
+ui();
+setCitizens(state.citizens);
+
+/* ---------------- render helpers ---------------- */
+function shade(face, sunDir, sunI, nt, amb) {
+  const nd = Math.max(0, dot(face.n, sunDir));
+  const upl = .5 + .5*face.n.y;
+  const k = amb + upl*.18 + nd*sunI*.62;
+  let [r,g,b] = face.rgb;
+  r = r*k*(1 + sunI*.10); g = g*k; b = b*k*(1 + nt*.24);
+  return [Math.min(255,r), Math.min(255,g), Math.min(255,b)];
+}
+function drawQuad(p, fill) {
+  ctx.fillStyle = fill;
+  ctx.beginPath();
+  ctx.moveTo(p[0].x, p[0].y);
+  for (let i=1;i<4;i++) ctx.lineTo(p[i].x, p[i].y);
+  ctx.closePath();
+  ctx.fill();
+}
+function faceDepth(f) {
+  let s = 0;
+  for (const p of f.pts) s += dot(sub(p, cam.eye), cam.fwd);
+  return s/4;
+}
+function renderFace(f, sunDir, sunI, nt, amb) {
+  const p2 = [];
+  for (const p of f.pts) {
+    const q = project(p);
+    if (!q) return;
+    p2.push(q);
+  }
+  const c = mul(add(add(f.pts[0], f.pts[1]), add(f.pts[2], f.pts[3])), .25);
+  if (dot(f.n, sub(cam.eye, c)) <= 0) return;
+  const [r,g,b] = shade(f, sunDir, sunI, nt, amb);
+  drawQuad(p2, css(r,g,b));
+  for (const d of f.decals) {
+    const q0 = project(d.o), q1 = project(add(d.o, d.u)),
+          q2 = project(add(add(d.o, d.u), d.v)), q3 = project(add(d.o, d.v));
+    if (!q0||!q1||!q2||!q3) continue;
+    let rgb2;
+    if (d.glowRgb && nt > 0) rgb2 = mix(mul3(d.rgb, amb + .3), d.glowRgb, nt*(d.night ?? 1));
+    else {
+      const k = amb + .28 + sunI*.5;
+      rgb2 = [Math.min(255,d.rgb[0]*k), Math.min(255,d.rgb[1]*k), Math.min(255,d.rgb[2]*k)];
+    }
+    drawQuad([q0,q1,q2,q3], css(rgb2[0], rgb2[1], rgb2[2]));
+  }
+}
+function glowCircle(x, y, r, rgb, a) {
+  if (a <= 0 || r <= 0) return;
+  const g = ctx.createRadialGradient(x, y, 1, x, y, r);
+  g.addColorStop(0, css(rgb[0],rgb[1],rgb[2],a));
+  g.addColorStop(1, css(rgb[0],rgb[1],rgb[2],0));
+  ctx.fillStyle = g;
+  ctx.fillRect(x-r, y-r, r*2, r*2);
+}
+
+/* ---------------- main loop ---------------- */
+let last = 0;
+function frame(ms) {
+  const t = ms/1000;
+  const dt = Math.min(.05, (ms-last)/1000 || .016);
+  last = ms;
+
+  /* clock */
+  if (state.clockLive) {
+    const now = new Date();
+    state.dayT = (now.getHours()*3600 + now.getMinutes()*60 + now.getSeconds())/86400;
+  } else state.dayT = (state.dayT + dt/60) % 1;
+  const nt = nightness(state.dayT);
+  const sa = (state.dayT - .25) * Math.PI * 2;
+  const sunDir = norm(V(Math.cos(sa)*.7, Math.max(.05, Math.sin(sa)), .5));
+  const sunI = Math.max(0, Math.sin(sa)) * (state.rain ? .45 : 1);
+  const amb = .16 + (1-nt)*.22 - (state.rain ? .05 : 0);
+
+  /* tour */
+  if (state.tour && !tween) {
+    tourHold -= dt;
+    if (tourHold <= 0) {
+      tourIdx = (tourIdx + 1) % (districts.length + 1);
+      flyTo(tourIdx === districts.length ? OVERVIEW : districts[tourIdx], 6.5);
+    }
+  }
+  if (tween) {
+    tween.t += dt;
+    const u = Math.min(1, tween.t/tween.dur);
+    const s = u*u*(3-2*u);
+    TARGET.x = lerp(tween.from.tx, tween.to.tx, s);
+    TARGET.y = lerp(tween.from.ty, tween.to.ty, s);
+    TARGET.z = lerp(tween.from.tz, tween.to.tz, s);
+    orbit.r = lerp(tween.from.r, tween.to.r, s);
+    orbit.phi = lerp(tween.from.phi, tween.to.phi, s);
+    orbit.theta = lerp(tween.from.theta, tween.to.theta, s);
+    if (u >= 1) tween = null;
+  } else if (orbit.drift || state.tour) orbit.theta += dt*.02;
+  updateCam();
+
+  /* sky */
+  let [top, bot] = skyStops(state.dayT);
+  if (state.rain) { top = mix(top,[42,54,72],.5); bot = mix(bot,[70,84,104],.5); }
+  const sky = ctx.createLinearGradient(0, 0, 0, H);
+  sky.addColorStop(0, css(top[0],top[1],top[2]));
+  sky.addColorStop(1, css(bot[0],bot[1],bot[2]));
+  ctx.fillStyle = sky;
+  ctx.fillRect(0, 0, W, H);
+
+  if (nt > 0) for (const st of stars) {
+    const q = project(add(cam.eye, mul(st.d, 500)));
+    if (!q) continue;
+    ctx.fillStyle = css(216,225,255, nt*(.4+.6*Math.abs(Math.sin(t*1.2+st.p)))*(state.rain?.25:.9));
+    ctx.fillRect(q.x, q.y, st.s, st.s);
+  }
+  const sunP = project(add(cam.eye, mul(sunDir, 400)));
+  if (sunP && sunI > 0) glowCircle(sunP.x, sunP.y, 90, [255,240,190], .5*sunI);
+  const moonP = project(add(cam.eye, mul(norm(V(-sunDir.x, Math.max(.2,-sunDir.y+.4), -sunDir.z)), 400)));
+  if (moonP && nt > .4) {
+    ctx.fillStyle = css(232,236,247, nt);
+    ctx.fillRect(moonP.x-9, moonP.y-9, 18, 18);
+    ctx.fillStyle = css(top[0],top[1],top[2], nt);
+    ctx.fillRect(moonP.x-11, moonP.y-11, 8, 8);
+  }
+
+  /* ground & water (sorted among themselves, before everything standing on them) */
+  const gOrder = groundFaces.map(f => ({f, d:faceDepth(f)})).sort((a,b) => b.d - a.d);
+  for (const {f} of gOrder) renderFace(f, sunDir, sunI, nt, amb);
+
+  /* water shimmer + falls streaks */
+  for (const wb of waterBodies) {
+    for (const r of wb.ripples) {
+      r.x += r.v*dt;
+      if (r.x > wb.x1) r.x = wb.x0;
+      const q1 = project(V(r.x - r.w/2, wb.y, r.z)), q2 = project(V(r.x + r.w/2, wb.y, r.z));
+      if (!q1 || !q2) continue;
+      ctx.strokeStyle = css(255,255,255, nt > .5 ? .10 : .22);
+      ctx.lineWidth = 1;
+      ctx.beginPath(); ctx.moveTo(q1.x, q1.y); ctx.lineTo(q2.x, q2.y); ctx.stroke();
+    }
+  }
+  for (let i=0;i<5;i++) {                                   /* the falls */
+    const fx = -3.2 + i*1.6, fy = 1.9 - ((t*2.2 + i*.7) % 1)*2;
+    const q1 = project(V(fx, fy, -11.75)), q2 = project(V(fx, fy-.5, -11.75));
+    if (q1 && q2) {
+      ctx.strokeStyle = css(240,248,255,.55);
+      ctx.beginPath(); ctx.moveTo(q1.x, q1.y); ctx.lineTo(q2.x, q2.y); ctx.stroke();
+    }
+  }
+  const foamQ = project(V(0, .2, -9.4));
+  if (foamQ) glowCircle(foamQ.x, foamQ.y, 700/foamQ.z, [230,242,250], .25 + .1*Math.sin(t*3));
+
+  /* citizen shadows */
+  for (const c of citizens) {
+    const q = project(V(c.x, terrainH(c.x, c.z)+.05, c.z));
+    if (!q) continue;
+    ctx.fillStyle = css(10,13,19, .25*(.3+sunI*.7));
+    ctx.beginPath();
+    ctx.ellipse(q.x, q.y, 260/q.z, 90/q.z, 0, 0, Math.PI*2);
+    ctx.fill();
+  }
+
+  /* dynamic faces: citizens, windmill blades, flag, boat */
+  const dyn = [];
+  for (const c of citizens) {
+    const g = terrainH(c.x, c.z);
+    const bob = c.pause > 0 ? 0 : Math.abs(Math.sin(t*6*c.spd + c.ph))*.08;
+    addBox(dyn, c.x, g+.62+bob, c.z, .3, .46, .2, c.hue, c.yaw);
+    addBox(dyn, c.x, g+1.3+bob, c.z, .19, .19, .17, [232,195,154], c.yaw);
+  }
+  for (let i=0;i<4;i++) {                                   /* windmill blades */
+    const a = t*.7 + i*Math.PI/2;
+    const dx = Math.cos(a), dy = Math.sin(a);
+    const hub = MILL.hub, r = MILL.r, wdt = .4;
+    const p1 = V(hub.x - dy*wdt, hub.y + dx*wdt, hub.z);
+    const p2 = V(hub.x + dy*wdt, hub.y - dx*wdt, hub.z);
+    const p3 = V(hub.x + dx*r + dy*wdt*.4, hub.y + dy*r - dx*wdt*.4, hub.z);
+    const p4 = V(hub.x + dx*r - dy*wdt*.4, hub.y + dy*r + dx*wdt*.4, hub.z);
+    dyn.push(quad([p1,p2,p3,p4], V(0,0,-1), hex('#d8d2c4')));
+    dyn.push(quad([p2,p1,p4,p3], V(0,0,1), hex('#c4beb0')));
+  }
+  {                                                          /* the cody flag */
+    const b = FLAG.base, wv = Math.sin(t*3)*.25;
+    dyn.push(quad([V(b.x,b.y,b.z), V(b.x+1.4,b.y-.1+wv*.3,b.z+wv), V(b.x+1.4,b.y-.7+wv*.3,b.z+wv), V(b.x,b.y-.8,b.z)], V(0,0,1), hex('#4fb4e6')));
+    dyn.push(quad([V(b.x+1.4,b.y-.1+wv*.3,b.z+wv), V(b.x,b.y,b.z), V(b.x,b.y-.8,b.z), V(b.x+1.4,b.y-.7+wv*.3,b.z+wv)], V(0,0,-1), hex('#3d94c2')));
+  }
+  {                                                          /* the moored boat bobs */
+    const by = .1 + Math.sin(t*1.1)*.08;
+    addBox(dyn, BOAT.x, by, BOAT.z, 1.5, .3, .7, '#6b4f34');
+    addBox(dyn, BOAT.x, by+.9, BOAT.z, .06, .8, .06, '#8f6f4c');
+  }
+
+  const order = staticFaces.concat(dyn).map(f => ({f, d:faceDepth(f)})).sort((a,b) => b.d - a.d);
+  for (const {f} of order) renderFace(f, sunDir, sunI, nt, amb);
+
+  /* ---- glows & overlays ---- */
+  for (const p of lampWorld) {
+    const q = project(p);
+    if (q && nt > 0) glowCircle(q.x, q.y, 1400/q.z, [255,215,106], nt*.5);
+  }
+  for (let i=0;i<mintGlows.length;i++) {                     /* research beacons blink */
+    const q = project(mintGlows[i]);
+    if (!q) continue;
+    const bl = (Math.sin(t*2 + i*2.1) > .6) ? 1 : .15;
+    ctx.fillStyle = css(127,224,178, .4 + bl*.6);
+    ctx.fillRect(q.x-1.5, q.y-1.5, 3, 3);
+    if (nt > 0) glowCircle(q.x, q.y, 500/q.z, [127,224,178], nt*bl*.5);
+  }
+  for (const b of marketBulbs) {                             /* market string bulbs */
+    const q = project(b);
+    if (!q) continue;
+    ctx.fillStyle = css(255,215,106, .5 + nt*.5);
+    ctx.fillRect(q.x-1.5, q.y-1.5, 3, 3);
+    if (nt > 0) glowCircle(q.x, q.y, 700/q.z, [255,215,106], nt*.6);
+  }
+  /* the Great Tree's gathered agents orbit the canopy */
+  for (let i=0;i<5;i++) {
+    const a = t*.35 + i*1.257;
+    const p = V(TREE.x + Math.cos(a)*6.5, TREE.y + Math.sin(a*.8+i)*1.6, TREE.z + Math.sin(a)*5.5);
+    const q = project(p);
+    if (!q) continue;
+    const hue = hex(AGENT_HUES[i]);
+    ctx.fillStyle = css(hue[0],hue[1],hue[2],.95);
+    ctx.fillRect(q.x-2, q.y-2, 4, 4);
+    glowCircle(q.x, q.y, 600/q.z, hue, (nt > 0 ? .5 : .25));
+  }
+  if (nt > 0) {                                              /* tree glow + fireflies */
+    const q = project(TREE);
+    if (q) glowCircle(q.x, q.y, 2600/q.z, [186,240,178], nt*.35);
+    for (let i=0;i<8;i++) {
+      const p = V(-34 + Math.sin(t*.4+i*2)*9, terrainH(-34,-18)+1+Math.sin(t*1.3+i)*1.2, -14 + Math.cos(t*.3+i)*7);
+      const q2 = project(p);
+      if (q2) {
+        const a = Math.max(0, Math.sin(t*1.7 + i*2.6));
+        ctx.fillStyle = css(255,215,106, a*.8);
+        ctx.fillRect(q2.x, q2.y, 2, 2);
+      }
+    }
+  }
+  /* lido floats */
+  for (const f of LIDO_FLOATS) {
+    const q = project(V(f.x + Math.sin(t*.5+f.z)*1.2, f.y + Math.sin(t*1.1+f.x)*.05, f.z + Math.cos(t*.4+f.x)*.8));
+    if (!q) continue;
+    ctx.fillStyle = css(f.h[0],f.h[1],f.h[2],1);
+    ctx.fillRect(q.x-2, q.y-2, 4, 4);
+    if (nt > 0) glowCircle(q.x, q.y, 500/q.z, [127,224,178], nt*.4);
+  }
+  /* fountain spray */
+  for (let i=0;i<6;i++) {
+    const u = (t*.9 + i/6) % 1;
+    const p = V(FOUNTAIN.x + Math.sin(i*2.4)*u*.8, FOUNTAIN.y + Math.sin(u*Math.PI)*1.1, FOUNTAIN.z + Math.cos(i*2.4)*u*.8);
+    const q = project(p);
+    if (q) glowCircle(q.x, q.y, 260/q.z, [230,242,250], .5*(1-u)+.15);
+  }
+
+  /* births: a light rises from the ward and drifts to the tree */
+  nextAmbientBirth -= dt;
+  if (nextAmbientBirth <= 0) { birth(); nextAmbientBirth = 70 + Math.random()*70; }
+  for (const b of births) {
+    b.age += dt;
+    const u = Math.min(1, b.age/9);
+    const s = u*u*(3-2*u);
+    const p = V(lerp(WARD.x, TREE.x, s), lerp(WARD.y+1, TREE.y+3, s) + Math.sin(u*Math.PI)*6, lerp(WARD.z, TREE.z, s));
+    const q = project(p);
+    if (q) {
+      const fade = b.age < .8 ? b.age/.8 : (b.age > 8 ? (9-b.age) : 1);
+      glowCircle(q.x, q.y, 900/q.z, [140,210,255], .7*fade);
+      ctx.fillStyle = css(235,248,255, fade);
+      ctx.fillRect(q.x-2, q.y-2, 4, 4);
+    }
+  }
+  for (let i=births.length-1;i>=0;i--) if (births[i].age > 9) births.splice(i,1);
+
+  /* thought / conversation dots */
+  for (const c of citizens) {
+    if (c.pause > 0 || c.talking) {
+      const q = project(V(c.x, terrainH(c.x,c.z)+2, c.z));
+      if (q) glowCircle(q.x, q.y, 380/q.z, c.hue, Math.max(0, Math.sin(t*2 + c.ph))*(c.talking ? .8 : .45));
+    }
+  }
+
+  /* steam */
+  puffClock += dt;
+  if (puffClock > .35 && steamEmitters.length) {
+    puffClock = 0;
+    puffs[puffI % 20] = { p:{...steamEmitters[puffI % steamEmitters.length]}, age:0, life:2.4+Math.random() };
+    puffI++;
+  }
+  for (const p of puffs) {
+    if (!p || p.age > p.life) continue;
+    p.age += dt;
+    p.p.y += dt*.9;
+    const q = project(p.p);
+    if (!q) continue;
+    const u = p.age/p.life;
+    glowCircle(q.x, q.y, (150+u*500)/q.z, [226,232,240], (1-u)*.35);
+  }
+
+  /* rain */
+  if (state.rain) {
+    ctx.strokeStyle = css(185,205,235,.4);
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    for (const d of drops) {
+      d.y += d.v*dt;
+      if (d.y > H+20) { d.y = -20; d.x = Math.random()*(W+200)-100; }
+      ctx.moveTo(d.x % (W+100), d.y);
+      ctx.lineTo((d.x % (W+100)) - 3, d.y + 14);
+    }
+    ctx.stroke();
+  }
+
+  /* ambient population drift */
+  if (!state.linked) {
+    ambientClock += dt;
+    if (ambientClock > 20) {
+      ambientClock = 0;
+      setCitizens(5 + Math.round((Math.sin(t/97)*.5+.5)*7) + (Math.random()*3|0));
+    }
+  }
+
+  /* citizens live their errands */
+  for (const c of citizens) {
+    if (c.pause > 0) {
+      c.pause -= dt;
+      if (c.pause <= 0) retarget(c);
+    } else if (c.route.length) {
+      const w = c.route[0];
+      const dx = w.x - c.x, dz = w.z - c.z;
+      const d = Math.hypot(dx, dz);
+      if (d < .6) {
+        c.route.shift();
+        if (!c.route.length) c.pause = 3 + Math.random()*5;
+      } else {
+        const hurry = state.rain ? 1.5 : 1;
+        c.x += dx/d * c.spd * hurry * dt;
+        c.z += dz/d * c.spd * hurry * dt;
+        c.yaw = Math.atan2(dx, dz);
+      }
+    } else retarget(c);
+    const q = project(V(c.x, terrainH(c.x,c.z)+1, c.z));
+    if (q) { c.sx = q.x; c.sy = q.y; c.sz = q.z; }
+    c.talking = false;
+  }
+  for (let i=0;i<citizens.length;i++) for (let j=i+1;j<citizens.length;j++) {
+    const a = citizens[i], b = citizens[j];
+    if (a.pause > 0 && b.pause > 0 && Math.hypot(a.x-b.x, a.z-b.z) < 3.4) a.talking = b.talking = true;
+  }
+
+  requestAnimationFrame(frame);
+}
+requestAnimationFrame(frame);
+</script>
+<script>
+/* Postcard edition — snapshot of July 19, 2026. No live wire: the city keeps its own counsel. */
+setCitizens(7);
+</script>
+</body>
+</html>
