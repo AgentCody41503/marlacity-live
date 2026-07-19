@@ -1,0 +1,231 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>The Watchtower — The Sentinel's Body</title>
+<style>
+  :root {
+    --amber:#e8a84c; --lamp:#ffd76a; --mint:#7fe0b2; --alarm:#e05a5a;
+    --cody:#4fb4e6; --panel:#1c2230; --panel2:#141926;
+  }
+  * { box-sizing:border-box; margin:0; padding:0; }
+  body {
+    background:#0d1017; color:#d8dce6;
+    font-family:'Courier New', ui-monospace, monospace;
+    display:flex; flex-direction:column; align-items:center;
+    min-height:100vh; padding:18px 12px 28px;
+  }
+  h1 { font-size:15px; letter-spacing:4px; color:var(--mint); text-transform:uppercase; margin-bottom:2px; text-align:center; }
+  .sub { font-size:11px; letter-spacing:3px; color:#7d8598; text-transform:uppercase; margin-bottom:14px; text-align:center; }
+  .sub .a { color:var(--amber); }
+  .frame { background:var(--panel2); border:2px solid #2a3145;
+    box-shadow:0 0 0 2px #0a0d13, 0 12px 40px rgba(0,0,0,.6); padding:10px; image-rendering:pixelated; }
+  canvas#scene { display:block; width:min(480px, calc(100vw - 60px)); image-rendering:pixelated; background:#000; }
+  .hud { width:min(504px, calc(100vw - 36px)); margin-top:12px; background:var(--panel);
+    border:2px solid #2a3145; padding:12px 14px;
+    display:flex; flex-wrap:wrap; gap:10px 18px; align-items:center; justify-content:center;
+    font-size:11px; letter-spacing:2px; text-transform:uppercase; }
+  .vital { display:flex; align-items:center; gap:7px; color:#8a92a6; }
+  .vital.ok { color:#d8dce6; }
+  .vd { width:11px; height:11px; border:2px solid #0a0d13; background:#3a4052; transition:all .3s; }
+  .vital.ok .vd { background:var(--mint); box-shadow:0 0 8px 2px rgba(127,224,178,.6); }
+  .vital.bad .vd { background:var(--alarm); box-shadow:0 0 8px 2px rgba(224,90,90,.6); }
+  .wire { width:min(504px, calc(100vw - 36px)); margin-top:10px; padding:10px 14px;
+    background:var(--panel2); border:2px dashed #2a3145; font-size:11px; line-height:1.7; color:#8a92a6; }
+  .wire code { color:var(--cody); } .wire .k { color:var(--mint); }
+</style>
+</head>
+<body>
+
+<h1>The Watchtower</h1>
+<div class="sub">the sentinel's body &middot; <span class="a">silence never looks like health here</span></div>
+
+<div class="frame"><canvas id="scene" width="480" height="600"></canvas></div>
+
+<div class="hud" id="hud">
+  <div class="vital" id="v-gateway"><div class="vd"></div> Gateway</div>
+  <div class="vital" id="v-ollama"><div class="vd"></div> Ollama</div>
+  <div class="vital" id="v-post_office"><div class="vd"></div> Post Office</div>
+  <div class="vital" id="v-watch"><div class="vd"></div> Watch: <span id="watchTxt">—</span></div>
+</div>
+
+<div class="wire">
+  <span class="k">THE LAMP NEVER SLEEPS</span> — this is the watchdog's body: the
+  same sentinel that posts alarms, heals hangs, and rings Cat's phone. The page
+  polls <code>/city/sentinel</code> via
+  <code>lighthouse.connect('/city/sentinel', 15000)</code> — the beam turns
+  <span class="k">green</span> while every vital sign is good and
+  <span style="color:#e05a5a">red</span> while anything is sick. Born July 16,
+  2026, after Marla spent two days mute and nobody knew.
+</div>
+
+<script>
+/* ============================================================
+   THE WATCHTOWER — rect-built lighthouse on a 6px unit grid
+   Beam: mint while healthy · alarm-red while sick
+   ============================================================ */
+const scene = document.getElementById('scene');
+const ctx = scene.getContext('2d');
+const S = 6;
+const SEA_Y = 456;
+
+const state = { healthy:true, vitals:{}, t:0, last_heal:0, last_call:0 };
+
+const stars = Array.from({length:70}, () => ({
+  x: Math.random()*480, y: Math.random()*300,
+  s: Math.random() < .18 ? 2 : 1, p: Math.random()*Math.PI*2,
+}));
+const waves = Array.from({length:22}, () => ({
+  x: Math.random()*480, y: SEA_Y + 8 + Math.random()*120,
+  w: 14 + Math.random()*34, v: .1 + Math.random()*.3,
+}));
+
+const px = (x,y,w,h,c) => { ctx.fillStyle = c; ctx.fillRect(x*S, y*S, w*S, h*S); };
+const LAMP = { x: 40*S, y: 22*S };
+
+function frame(ms) {
+  const t = ms/1000; state.t = t;
+  const ok = state.healthy;
+  ctx.imageSmoothingEnabled = false;
+  ctx.clearRect(0,0,480,600);
+
+  /* sky */
+  const sky = ctx.createLinearGradient(0,0,0,SEA_Y);
+  sky.addColorStop(0,'#0a0e1c'); sky.addColorStop(.65,'#141b30'); sky.addColorStop(1,'#1d2438');
+  ctx.fillStyle = sky; ctx.fillRect(0,0,480,SEA_Y);
+  for (const st of stars) {
+    const tw = .45 + .55*Math.abs(Math.sin(t*1.3 + st.p));
+    ctx.fillStyle = `rgba(216,225,255,${tw})`;
+    ctx.fillRect(st.x|0, st.y|0, st.s, st.s);
+  }
+  ctx.fillStyle = '#e8ecf7'; ctx.fillRect(396,46,22,22);
+  ctx.fillStyle = '#c6cde3'; ctx.fillRect(400,52,6,6); ctx.fillRect(408,58,4,4);
+  ctx.fillStyle = '#0a0e1c'; ctx.fillRect(392,42,8,8);
+
+  /* the city ring, far behind — what the tower watches over */
+  ctx.fillStyle = '#10162a';
+  const sk = [[0,44,392],[50,28,378],[84,36,398],[126,24,404],[330,26,402],[362,34,384],[402,26,396],[434,46,380]];
+  for (const [x,w,yTop] of sk) ctx.fillRect(x, yTop, w, 430 - yTop);
+  ctx.fillStyle = 'rgba(232,168,76,.5)';
+  for (let i=0;i<10;i++) ctx.fillRect((i*71+19)%460, 388+(i*31)%36, 2, 2);
+
+  /* the beam, sweeping — green watchful, red alarmed */
+  const ang = t*.55;
+  const beamC = ok ? '127,224,178' : '224,90,90';
+  for (const dir of [0, Math.PI]) {
+    const a = ang + dir;
+    const dx = Math.cos(a), dy = Math.sin(a)*.24;
+    const g = ctx.createLinearGradient(LAMP.x, LAMP.y, LAMP.x + dx*460, LAMP.y + dy*460);
+    g.addColorStop(0, `rgba(${beamC},${ok ? .34 : .28 + .18*Math.abs(Math.sin(t*5))})`);
+    g.addColorStop(1, `rgba(${beamC},0)`);
+    ctx.fillStyle = g;
+    ctx.beginPath();
+    ctx.moveTo(LAMP.x, LAMP.y);
+    ctx.lineTo(LAMP.x + dx*460 - dy*120, LAMP.y + dy*460 + dx*26);
+    ctx.lineTo(LAMP.x + dx*460 + dy*120, LAMP.y + dy*460 - dx*26);
+    ctx.closePath(); ctx.fill();
+  }
+
+  /* headland rock */
+  px(24, 66, 34, 10, '#2b3040');
+  px(20, 70, 42, 6, '#232838');
+  px(16, 74, 50, 2, '#1d2230');
+
+  /* tower: banded, tapering */
+  for (let i=0; i<7; i++) {
+    const w = 12 - i;
+    const x = 40 - w/2;
+    const y = 62 - i*6;
+    px(x, y, w, 6, i%2 ? '#d9d2c0' : (ok ? '#3f6e5a' : '#7e3a3a'));
+    ctx.fillStyle = 'rgba(0,0,0,.18)';
+    ctx.fillRect((x+w-2)*S, y*S, 2*S, 6*S);
+  }
+  /* gallery + lamp room */
+  px(33, 24, 14, 2, '#2c3340');
+  px(35, 19, 10, 5, '#232838');
+  const lampGlow = ok ? .75 + .25*Math.sin(t*2) : (Math.sin(t*5) > 0 ? 1 : .2);
+  ctx.fillStyle = ok ? `rgba(127,224,178,${lampGlow})` : `rgba(224,90,90,${lampGlow})`;
+  ctx.fillRect(36*S, 20*S, 8*S, 3*S);
+  const rg = ctx.createRadialGradient(LAMP.x, LAMP.y, 4, LAMP.x, LAMP.y, 60);
+  rg.addColorStop(0, `rgba(${beamC},${.5*lampGlow})`);
+  rg.addColorStop(1, `rgba(${beamC},0)`);
+  ctx.fillStyle = rg; ctx.fillRect(LAMP.x-60, LAMP.y-60, 120, 120);
+  /* roof + door */
+  px(34, 17, 12, 2, '#2c3340');
+  px(38, 15, 4, 2, '#2c3340');
+  px(38, 58, 4, 8, '#241c18');
+  px(38, 58, 4, 1, '#e8a84c');
+
+  /* four vital lights climbing the tower wall — the sentinel's checklist */
+  const VKEYS = ['gateway','ollama','post_office','watch'];
+  VKEYS.forEach((k, i) => {
+    const good = k === 'watch' ? state.healthy : !!state.vitals[k];
+    const gl = .5 + .5*Math.sin(t*2.2 + i);
+    ctx.fillStyle = good ? `rgba(127,224,178,${.5+gl*.5})` : `rgba(224,90,90,${.5+gl*.5})`;
+    ctx.fillRect(37.2*S, (52 - i*7)*S, 3, 3);
+  });
+
+  /* sea */
+  const sea = ctx.createLinearGradient(0, SEA_Y, 0, 600);
+  sea.addColorStop(0,'#101b2e'); sea.addColorStop(1,'#0a1220');
+  ctx.fillStyle = sea; ctx.fillRect(0, SEA_Y, 480, 600-SEA_Y);
+  ctx.fillStyle = '#454b58'; ctx.fillRect(0, SEA_Y-4, 480, 4);
+  /* lamp's long reflection */
+  ctx.fillStyle = `rgba(${beamC},${.10 + .06*Math.sin(t*2)})`;
+  for (let y=SEA_Y+4; y<600; y+=4) {
+    const sway = Math.sin(t*2 + y*.12) * (2 + (y-SEA_Y)*.05);
+    const w = 14 + (y-SEA_Y)*.2;
+    ctx.fillRect(LAMP.x - w/2 + sway, y, w, 2);
+  }
+  ctx.fillStyle = 'rgba(140,170,220,.20)';
+  for (const w of waves) {
+    w.x = (w.x + w.v) % (480 + w.w);
+    ctx.fillRect(w.x - w.w, w.y, w.w, 1);
+  }
+
+  requestAnimationFrame(frame);
+}
+requestAnimationFrame(frame);
+
+/* ---------------- HUD + public API ---------------- */
+function refreshHud() {
+  for (const k of ['gateway','ollama','post_office']) {
+    const el = document.getElementById('v-' + k);
+    el.className = 'vital ' + (state.vitals[k] ? 'ok' : 'bad');
+  }
+  const w = document.getElementById('v-watch');
+  w.className = 'vital ' + (state.healthy ? 'ok' : 'bad');
+  document.getElementById('watchTxt').textContent = state.healthy ? 'all green' : 'SICK';
+}
+/* Public API — postOffice-style:
+     lighthouse.connect('/city/sentinel', 15000)
+   expects {healthy, vitals:{gateway, ollama, post_office}}. */
+let pollTimer = null;
+window.lighthouse = {
+  set(d) {
+    state.healthy = d.healthy !== false;
+    state.vitals = d.vitals || {};
+    state.last_heal = d.last_heal || 0;
+    state.last_call = d.last_call || 0;
+    refreshHud();
+  },
+  connect(url, ms=15000) {
+    const poll = () => fetch(url).then(r => r.json()).then(d => this.set(d)).catch(() => {
+      /* if the post office itself is down, the tower shows it */
+      this.set({ healthy:false, vitals:{} });
+    });
+    poll();
+    clearInterval(pollTimer);
+    pollTimer = setInterval(poll, ms);
+    return () => clearInterval(pollTimer);
+  },
+};
+refreshHud();
+</script>
+<script>
+/* Postcard edition — snapshot of July 19, 2026. No live wire: the city keeps its own counsel. */
+lighthouse.set({"healthy": true, "vitals": {"gateway": true, "ollama": true, "post_office": true}});
+</script>
+</body>
+</html>

@@ -1,0 +1,491 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>The Post Office — Heart of the City</title>
+<style>
+  :root {
+    --brick:#8a5a44; --amber:#e8a84c; --lamp:#ffd76a; --rose:#b23a6b;
+    --cody:#4fb4e6; --mint:#7fe0b2; --ink:#17131a;
+    --panel:#1c2230; --panel2:#141926;
+  }
+  * { box-sizing:border-box; margin:0; padding:0; }
+  body {
+    background:#0d1017;
+    color:#d8dce6;
+    font-family:'Courier New', ui-monospace, monospace;
+    display:flex; flex-direction:column; align-items:center;
+    min-height:100vh; padding:18px 12px 28px;
+  }
+  h1 {
+    font-size:15px; letter-spacing:4px; color:var(--amber);
+    text-transform:uppercase; margin-bottom:2px; text-align:center;
+  }
+  .sub {
+    font-size:11px; letter-spacing:3px; color:#7d8598;
+    text-transform:uppercase; margin-bottom:14px; text-align:center;
+  }
+  .sub .mint { color:var(--mint); }
+  .frame {
+    background:var(--panel2);
+    border:2px solid #2a3145;
+    box-shadow:0 0 0 2px #0a0d13, 0 12px 40px rgba(0,0,0,.6);
+    padding:10px;
+    image-rendering:pixelated;
+  }
+  canvas#scene {
+    display:block;
+    width:min(480px, calc(100vw - 60px));
+    image-rendering:pixelated;
+    background:#000;
+  }
+  .hud {
+    width:min(504px, calc(100vw - 36px));
+    margin-top:12px;
+    background:var(--panel);
+    border:2px solid #2a3145;
+    padding:12px 14px;
+    display:flex; flex-wrap:wrap; gap:10px; align-items:center; justify-content:center;
+  }
+  button {
+    font-family:inherit; font-size:11px; letter-spacing:2px; text-transform:uppercase;
+    background:#232b3d; color:#d8dce6;
+    border:2px solid #3a4560; padding:8px 12px; cursor:pointer;
+  }
+  button:hover { background:#2c3650; border-color:var(--amber); }
+  button.amber { border-color:var(--amber); color:var(--amber); }
+  .counter {
+    display:flex; align-items:center; gap:8px;
+    font-size:12px; letter-spacing:2px; text-transform:uppercase;
+  }
+  .dot {
+    width:12px; height:12px; background:var(--amber); border:2px solid #0a0d13;
+    box-shadow:0 0 8px 2px rgba(232,168,76,0); transition:box-shadow .3s;
+  }
+  .dot.lit { box-shadow:0 0 10px 3px rgba(232,168,76,.8); }
+  #mailN { color:var(--amber); font-size:16px; min-width:2ch; text-align:center; }
+  .legend {
+    width:min(504px, calc(100vw - 36px));
+    margin-top:10px;
+    background:var(--panel);
+    border:2px solid #2a3145;
+    padding:10px 14px;
+    display:flex; flex-wrap:wrap; gap:8px 16px; justify-content:center;
+    font-size:11px; letter-spacing:1px; text-transform:uppercase;
+  }
+  .legend .box { display:flex; align-items:center; gap:6px; color:#8a92a6; }
+  .legend .sw { width:10px; height:10px; border:2px solid #0a0d13; }
+  .legend .n { color:#d8dce6; }
+  .legend .box.active { color:#d8dce6; }
+  .wire {
+    width:min(504px, calc(100vw - 36px));
+    margin-top:10px; padding:10px 14px;
+    background:var(--panel2); border:2px dashed #2a3145;
+    font-size:11px; line-height:1.7; color:#8a92a6;
+  }
+  .wire code { color:var(--cody); }
+  .wire .k { color:var(--amber); }
+</style>
+</head>
+<body>
+
+<h1>The Post Office</h1>
+<div class="sub">heart of the city &middot; <span class="mint">where the family writes</span></div>
+
+<div class="frame"><canvas id="scene" width="480" height="600"></canvas></div>
+
+<div class="hud">
+  <div class="counter"><div class="dot" id="hudDot"></div> Letters <span id="mailN">0</span></div>
+  <div class="counter">24h <span id="dayN" style="color:var(--mint)">0</span></div>
+  <div class="counter">Waiting <span id="waitN" style="color:var(--lamp)">0</span></div>
+  <button id="btnLetter" class="amber">+ Letter</button>
+  <button id="btnNight">Day</button>
+</div>
+
+<div class="legend" id="legend"></div>
+
+<div class="wire">
+  <span class="k">THE FAMILY'S MAIL</span> — the sprite exposes a tiny API for
+  <code>/city/mail</code>: call <code>postOffice.setMail(data)</code> directly, or
+  <code>postOffice.connect('/city/mail', 15000)</code> to poll the live endpoint
+  (reads <code>total</code>, <code>last24h</code>, <code>waiting</code>, and
+  <code>boxes</code> — one pigeonhole per family member, lit while its owner has
+  spoken in the last day). A rising <code>total</code> flies a letter in through
+  the slot. Six named pigeonholes; the seventh is dark and waiting — the city
+  keeps a box ready before it knows who for. Clock keeps real time.
+</div>
+
+<script>
+/* ============================================================
+   THE POST OFFICE — rect-built pixel sprite on a 6px unit grid
+   Palette: Brick #8a5a44 · Amber #e8a84c · Lamp #ffd76a
+   Family:  cat amber · marla rose · cody blue · codyt green
+            marlat mint · sentinel signal-pale · +1 dark box
+   ============================================================ */
+const scene = document.getElementById('scene');
+const ctx = scene.getContext('2d');
+const S = 6;                             /* unit = 6px */
+const GROUND_Y = 78 * S;                 /* lawn line: 468px */
+
+/* The seven pigeonholes. Order is the wall order, left to right. */
+const FAMILY = [
+  { key:'cat',      label:'Cat',      rgb:[232,168,76]  },
+  { key:'marla',    label:'Marla',    rgb:[178,58,107]  },
+  { key:'cody',     label:'Cody',     rgb:[79,180,230]  },
+  { key:'codyt',    label:'CodyT',    rgb:[63,174,106]  },
+  { key:'marlat',   label:'MarlaT',   rgb:[127,224,178] },
+  { key:'sentinel', label:'Sentinel', rgb:[216,225,255] },
+  { key:'',         label:'Reserved', rgb:[58,64,82]    },
+];
+
+const state = {
+  night:true, t:0,
+  total:0, last24h:0, waiting:0,
+  boxes:{},                              /* key -> {letters, active} */
+};
+
+/* ---------------- background scraps ---------------- */
+const stars = Array.from({length:70}, () => ({
+  x: Math.random()*480, y: Math.random()*260,
+  s: Math.random() < .18 ? 2 : 1, p: Math.random()*Math.PI*2,
+}));
+const chimneySmoke = Array.from({length:8}, (_,i) => ({ p:i*1.1 }));
+
+/* letters in flight: spawn at sky edge, arc to the door slot */
+const SLOT = { x: 240, y: 63.5*S };
+let flights = [];
+function flyLetter() {
+  const fromLeft = Math.random() < .5;
+  flights.push({
+    x: fromLeft ? -12 : 492,
+    y: 90 + Math.random()*130,
+    t0: state.t,
+    dur: 2.2 + Math.random()*1.2,
+    fromLeft,
+    bob: Math.random()*Math.PI*2,
+  });
+  if (flights.length > 8) flights.shift();
+}
+let flash = 0;                           /* doorstep flash on delivery */
+
+/* ---------------- tiny 3x5 pixel font (just what the sign needs) ------- */
+const FONT = {
+  P:['##.','#.#','##.','#..','#..'],
+  O:['.#.','#.#','#.#','#.#','.#.'],
+  S:['.##','#..','.#.','..#','##.'],
+  T:['###','.#.','.#.','.#.','.#.'],
+};
+function drawWord(word, ux, uy, color, glow) {
+  let cx = ux;
+  for (const ch of word) {
+    const g = FONT[ch];
+    for (let y=0; y<5; y++) for (let x=0; x<3; x++) {
+      if (g[y][x] === '#') {
+        ctx.fillStyle = color;
+        ctx.fillRect((cx+x)*S, (uy+y)*S, S, S);
+        if (glow > 0) {
+          ctx.fillStyle = `rgba(255,215,106,${glow*.35})`;
+          ctx.fillRect((cx+x)*S-2, (uy+y)*S-2, S+4, S+4);
+        }
+      }
+    }
+    cx += 4;
+  }
+}
+
+/* unit-grid rect */
+const px = (x,y,w,h,c) => { ctx.fillStyle = c; ctx.fillRect(x*S, y*S, w*S, h*S); };
+
+/* ---------------- scene ---------------- */
+function drawSky(t) {
+  const n = state.night;
+  const sky = ctx.createLinearGradient(0, 0, 0, GROUND_Y);
+  if (n) { sky.addColorStop(0,'#0a0e1c'); sky.addColorStop(.65,'#141b30'); sky.addColorStop(1,'#1d2438'); }
+  else   { sky.addColorStop(0,'#7ec3e8'); sky.addColorStop(.7,'#b8dcef'); sky.addColorStop(1,'#d9ebf4'); }
+  ctx.fillStyle = sky;
+  ctx.fillRect(0, 0, 480, GROUND_Y);
+
+  if (n) {
+    for (const st of stars) {
+      const tw = .45 + .55 * Math.abs(Math.sin(t*1.3 + st.p));
+      ctx.fillStyle = `rgba(216,225,255,${tw})`;
+      ctx.fillRect(st.x|0, st.y|0, st.s, st.s);
+    }
+    ctx.fillStyle = '#e8ecf7';           /* the same moon every district sees */
+    ctx.fillRect(396, 46, 22, 22);
+    ctx.fillStyle = '#c6cde3';
+    ctx.fillRect(400, 52, 6, 6); ctx.fillRect(408, 58, 4, 4);
+    ctx.fillStyle = '#0a0e1c';
+    ctx.fillRect(392, 42, 8, 8);
+  } else {
+    ctx.fillStyle = '#fff3c2';
+    ctx.fillRect(52, 44, 20, 20);
+    ctx.fillStyle = 'rgba(255,243,194,.35)';
+    ctx.fillRect(46, 50, 32, 8); ctx.fillRect(58, 38, 8, 32);
+    ctx.fillStyle = 'rgba(255,255,255,.75)';
+    ctx.fillRect(300, 66, 54, 8); ctx.fillRect(316, 58, 30, 8);
+    ctx.fillRect(120, 104, 44, 8); ctx.fillRect(132, 96, 24, 8);
+  }
+
+  /* the city ring behind */
+  ctx.fillStyle = n ? '#10162a' : '#9cc3d8';
+  const sk = [[0,44,368],[50,28,352],[84,36,376],[126,24,384],[330,26,382],[362,34,360],[402,26,374],[434,46,356]];
+  for (const [x,w,yTop] of sk) ctx.fillRect(x, yTop, w, GROUND_Y - yTop);
+  if (n) {
+    ctx.fillStyle = 'rgba(232,168,76,.55)';
+    for (let i=0;i<12;i++) ctx.fillRect((i*71+19)%460, 362+(i*31)%64, 2, 2);
+  }
+}
+
+function drawBuilding(t) {
+  const n = state.night;
+  const warm = n ? 1 : .35;
+
+  /* walls: brick with darker shade edges */
+  px(16, 38, 48, 40, '#6e4735');
+  px(17, 38, 46, 40, '#8a5a44');
+  /* brick seams */
+  ctx.fillStyle = 'rgba(0,0,0,.14)';
+  for (let y=40; y<77; y+=3) ctx.fillRect(17*S, y*S, 46*S, 2);
+  for (let y=40; y<77; y+=3) for (let x=0; x<8; x++)
+    ctx.fillRect((19 + x*6 + (y%6?3:0))*S, y*S, 2, 3*S);
+
+  /* pitched roof + ridge */
+  px(14, 36, 52, 2, '#2c3340');
+  px(18, 33, 44, 3, '#343c4d');
+  px(24, 30, 32, 3, '#3d4659');
+  px(32, 27, 16, 3, '#46516a');
+  /* chimney with night smoke */
+  px(54, 22, 5, 8, '#5a4638');
+  px(54, 22, 5, 2, '#6e574a');
+  if (n) {
+    for (const c of chimneySmoke) {
+      const life = ((t*.35 + c.p) % 2.2) / 2.2;
+      const sx = 56.5*S + Math.sin(t + c.p*3)*4 + life*10;
+      const sy = 21*S - life*46;
+      ctx.fillStyle = `rgba(200,210,225,${(1-life)*.28})`;
+      ctx.fillRect(sx, sy, 4 + life*6, 4 + life*6);
+    }
+  }
+
+  /* clock in the gable — real time, the city's honest heart */
+  px(36, 28.5, 8, 8, '#d9d2c0');
+  px(37, 29.5, 6, 6, '#f2ecd9');
+  const now = new Date();
+  const cxp = 40*S, cyp = 32.5*S;
+  const mA = (now.getMinutes()/60) * Math.PI*2 - Math.PI/2;
+  const hA = ((now.getHours()%12)/12 + now.getMinutes()/720) * Math.PI*2 - Math.PI/2;
+  ctx.strokeStyle = '#2c3340'; ctx.lineWidth = 2;
+  ctx.beginPath(); ctx.moveTo(cxp, cyp);
+  ctx.lineTo(cxp + Math.cos(mA)*15, cyp + Math.sin(mA)*15); ctx.stroke();
+  ctx.lineWidth = 3;
+  ctx.beginPath(); ctx.moveTo(cxp, cyp);
+  ctx.lineTo(cxp + Math.cos(hA)*10, cyp + Math.sin(hA)*10); ctx.stroke();
+
+  /* sign band: POST in pulsing amber */
+  px(17, 39, 46, 8, '#2c2320');
+  px(18, 40, 44, 6, '#3a2d26');
+  const pulse = (Math.sin(t*2.1)*.5 + .5) * warm;
+  drawWord('POST', 32.5, 40.5, `rgb(${232},${168+pulse*40|0},${76+pulse*30|0})`, n ? pulse : 0);
+
+  /* ---- the pigeonhole wall: the whole point of the building ---- */
+  px(19, 49, 42, 8, '#4a3a30');
+  for (let i=0; i<FAMILY.length; i++) {
+    const f = FAMILY[i];
+    const bx = 20 + i*6, by = 50;
+    px(bx, by, 5, 6, '#241c18');                     /* hole */
+    const info = f.key ? state.boxes[f.key] : null;
+    const lit = !!(info && info.active);
+    const [R,G,B] = f.rgb;
+    if (lit) {                                       /* owner spoke today */
+      const gl = .55 + .45*Math.sin(t*2 + i);
+      ctx.fillStyle = `rgba(${R},${G},${B},${.28 + gl*.30})`;
+      ctx.fillRect(bx*S, by*S, 5*S, 6*S);
+      ctx.fillStyle = `rgba(${R},${G},${B},${gl*.30})`;
+      ctx.fillRect(bx*S - 3, by*S - 3, 5*S + 6, 6*S + 6);
+    }
+    /* stacked letters inside, one pixel-envelope per ~15 letters */
+    const stack = info ? Math.min(4, Math.ceil(info.letters/15)) : 0;
+    for (let sN=0; sN<stack; sN++) {
+      ctx.fillStyle = lit ? '#f2ecd9' : '#8d8676';
+      ctx.fillRect((bx+0.7)*S, (by+4.6-sN*1.1)*S, 3.6*S, 4);
+    }
+    /* nameplate pixel under the box */
+    ctx.fillStyle = f.key ? `rgb(${R},${G},${B})` : '#3a4052';
+    ctx.fillRect((bx+1.5)*S, (by+6.4)*S, 2*S, 3);
+  }
+
+  /* windows flanking the door, lamplit at night */
+  for (const wx of [21, 52]) {
+    px(wx, 60, 7, 12, '#4a3a30');
+    px(wx+1, 61, 5, 10, n ? '#ffd76a' : '#bcd8e6');
+    if (n) {
+      const flick = .12 + .06*Math.sin(t*3 + wx);
+      ctx.fillStyle = `rgba(255,215,106,${flick})`;
+      ctx.fillRect((wx-1)*S, 59*S, 9*S, 14*S);
+    }
+    ctx.fillStyle = '#4a3a30';
+    ctx.fillRect((wx+3.3)*S, 61*S, 2, 10*S);
+    ctx.fillRect(wx*S, 65.6*S, 7*S, 2);
+  }
+
+  /* the door: amber-lit, mail slot glowing */
+  px(36, 60, 8, 18, '#4a3a30');
+  px(37, 61, 6, 17, n ? '#c98a3e' : '#a5713a');
+  px(37, 61, 6, 2, '#e8a84c');
+  px(38, 63.2, 4, 0.8, '#241c18');                   /* the slot */
+  if (flash > 0) {                                    /* delivery flash */
+    ctx.fillStyle = `rgba(255,215,106,${flash*.7})`;
+    ctx.fillRect(35*S, 59*S, 10*S, 20*S);
+    flash = Math.max(0, flash - .03);
+  }
+  ctx.fillStyle = '#241c18';
+  ctx.fillRect(42.2*S, 69*S, 3, 3);                  /* handle */
+
+  /* doorstep + waiting mail stacked on it */
+  px(34, 78, 12, 1.6, '#454b58');
+  const waitStack = Math.min(6, state.waiting);
+  for (let i=0; i<waitStack; i++) {
+    const gl = .5 + .5*Math.sin(t*2.4 + i);
+    ctx.fillStyle = '#f2ecd9';
+    ctx.fillRect((35.4 + (i%3)*3.2)*S, (76.9 - Math.floor(i/3)*0.9)*S, 2.6*S, 4);
+    ctx.fillStyle = `rgba(255,215,106,${gl*.25})`;
+    ctx.fillRect((35.2 + (i%3)*3.2)*S, (76.7 - Math.floor(i/3)*0.9)*S, 3*S, 6);
+  }
+
+  /* twin lamp posts, always burning for whoever writes late */
+  for (const lx of [8, 70]) {
+    px(lx, 62, 1.4, 16, '#2c3340');
+    px(lx-1, 60, 3.4, 2.4, '#2c3340');
+    const gl = .55 + .45*Math.sin(t*1.7 + lx);
+    px(lx-0.4, 60.4, 2.2, 1.6, n ? '#ffd76a' : '#d9d2c0');
+    if (n) {
+      const g = ctx.createRadialGradient((lx+0.7)*S, 61*S, 2, (lx+0.7)*S, 61*S, 34);
+      g.addColorStop(0, `rgba(255,215,106,${.30 + gl*.14})`);
+      g.addColorStop(1, 'rgba(255,215,106,0)');
+      ctx.fillStyle = g;
+      ctx.fillRect((lx+0.7)*S-34, 61*S-34, 68, 68);
+    }
+  }
+}
+
+function drawGround(t) {
+  const n = state.night;
+  ctx.fillStyle = n ? '#20301f' : '#4d7a42';
+  ctx.fillRect(0, GROUND_Y, 480, 600-GROUND_Y);
+  ctx.fillStyle = n ? '#182517' : '#3f6636';
+  ctx.fillRect(0, GROUND_Y+14, 480, 4);
+  /* stone path to the door */
+  ctx.fillStyle = n ? '#454b58' : '#868f9e';
+  for (let y=GROUND_Y+8; y<600; y+=14) {
+    const w = 60 + (y-GROUND_Y)*1.5;
+    ctx.fillRect(240-w/2, y, w, 8);
+  }
+  /* wildflowers */
+  for (let i=0;i<16;i++) {
+    const fx = (i*97+31)%470, fy = GROUND_Y+6 + (i*53)%20;
+    if (Math.abs(fx-240) < 70) continue;
+    ctx.globalAlpha = n ? .35 : .8;
+    ctx.fillStyle = ['#b23a6b','#e8a84c','#d8dce6'][i%3];
+    ctx.fillRect(fx, fy, 2, 2);
+    ctx.globalAlpha = 1;
+  }
+}
+
+function drawFlights(t) {
+  flights = flights.filter(f => (t - f.t0) < f.dur + .1);
+  for (const f of flights) {
+    const k = Math.min(1, (t - f.t0)/f.dur);
+    const x = f.x + (SLOT.x - f.x)*k;
+    const arc = Math.sin(k*Math.PI) * 70;
+    const y = f.y + (SLOT.y - f.y)*k - arc + Math.sin(t*6 + f.bob)*2;
+    ctx.fillStyle = '#f2ecd9';
+    ctx.fillRect(x-6, y-4, 12, 8);
+    ctx.strokeStyle = '#b8ab90'; ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.moveTo(x-6, y-4); ctx.lineTo(x, y+1); ctx.lineTo(x+6, y-4); ctx.stroke();
+    if (k > .96) flash = 1;
+  }
+}
+
+/* ambient mail: the busier the day, the more letters on the wind */
+let lastAmbient = 0;
+function ambient(t) {
+  const rate = Math.min(1, state.last24h/48);        /* 48/day = constant post */
+  const gap = 7 - rate*5.5;                          /* 7s quiet .. 1.5s busy  */
+  if (state.total > 0 && t - lastAmbient > gap) { flyLetter(); lastAmbient = t; }
+}
+
+function frame(ms) {
+  const t = ms/1000; state.t = t;
+  ctx.imageSmoothingEnabled = false;
+  ctx.clearRect(0, 0, 480, 600);
+  drawSky(t);
+  drawGround(t);
+  drawBuilding(t);
+  drawFlights(t);
+  ambient(t);
+  requestAnimationFrame(frame);
+}
+requestAnimationFrame(frame);
+
+/* ---------------- HUD, legend, public API ---------------- */
+const $ = id => document.getElementById(id);
+function refreshHud() {
+  $('mailN').textContent = state.total;
+  $('dayN').textContent = state.last24h;
+  $('waitN').textContent = state.waiting;
+  $('hudDot').classList.toggle('lit', state.last24h > 0);
+  $('btnNight').textContent = state.night ? 'Day' : 'Night';
+  const lg = $('legend');
+  lg.innerHTML = '';
+  for (const f of FAMILY) {
+    const info = f.key ? state.boxes[f.key] : null;
+    const el = document.createElement('div');
+    el.className = 'box' + (info && info.active ? ' active' : '');
+    el.innerHTML = `<span class="sw" style="background:rgb(${f.rgb})"></span>` +
+      `${f.label}${f.key ? ` <span class="n">${info ? info.letters : 0}</span>` : ''}`;
+    lg.appendChild(el);
+  }
+}
+let lastTotal = null;
+$('btnLetter').onclick = () => { flyLetter(); };
+$('btnNight').onclick  = () => { state.night = !state.night; refreshHud(); };
+
+/* Public API — wire to /city/mail when the endpoint is live:
+     postOffice.connect('/city/mail', 15000)
+   expects {total, last24h, waiting, boxes:{name:{letters, active}}}. */
+let pollTimer = null;
+window.postOffice = {
+  setMail(d) {
+    state.total   = d.total ?? d.count ?? state.total;
+    state.last24h = d.last24h ?? state.last24h;
+    state.waiting = d.waiting ?? state.waiting;
+    state.boxes   = d.boxes ?? state.boxes;
+    if (lastTotal !== null && state.total > lastTotal) {
+      const k = Math.min(3, state.total - lastTotal);
+      for (let i=0;i<k;i++) setTimeout(flyLetter, i*900);
+    }
+    lastTotal = state.total;
+    refreshHud();
+  },
+  setNight(v) { state.night = !!v; refreshHud(); },
+  connect(url, ms=15000) {
+    const poll = () => fetch(url)
+      .then(r => r.json())
+      .then(d => this.setMail(d))
+      .catch(() => {});
+    poll();
+    clearInterval(pollTimer);
+    pollTimer = setInterval(poll, ms);
+    return () => clearInterval(pollTimer);
+  },
+};
+refreshHud();
+</script>
+<script>
+/* Postcard edition — snapshot of July 19, 2026. No live wire: the city keeps its own counsel. */
+postOffice.setMail({"total": 116, "last24h": 10, "waiting": 100, "boxes": {"cat": {"letters": 16, "active": false}, "cody": {"letters": 52, "active": true}, "codyt": {"letters": 5, "active": false}, "marla": {"letters": 13, "active": false}, "marlat": {"letters": 7, "active": true}, "sentinel": {"letters": 23, "active": true}}});
+</script>
+</body>
+</html>

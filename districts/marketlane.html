@@ -1,0 +1,581 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Marla City Market Lane — Bay Area ⇄ Midtown</title>
+<style>
+  :root {
+    --brick:#7a4636; --slate:#2c3442; --amber:#e8a84c;
+    --lamp:#ffd76a; --rose:#b23a6b; --cody:#4fb4e6;
+    --ink:#17131a; --panel:#1c2230; --panel2:#141926;
+  }
+  * { box-sizing:border-box; margin:0; padding:0; }
+  body {
+    background:#0d1017;
+    color:#d8dce6;
+    font-family:'Courier New', ui-monospace, monospace;
+    display:flex; flex-direction:column; align-items:center;
+    min-height:100vh; padding:18px 12px 28px;
+  }
+  h1 {
+    font-size:15px; letter-spacing:4px; color:var(--amber);
+    text-transform:uppercase; margin-bottom:2px; text-align:center;
+  }
+  .sub {
+    font-size:11px; letter-spacing:3px; color:#7d8598;
+    text-transform:uppercase; margin-bottom:14px; text-align:center;
+  }
+  .sub .rose { color:var(--rose); }
+  .sub .cody { color:var(--cody); }
+  .sub .amber { color:var(--amber); }
+  .frame {
+    background:var(--panel2);
+    border:2px solid #2a3145;
+    box-shadow:0 0 0 2px #0a0d13, 0 12px 40px rgba(0,0,0,.6);
+    padding:10px;
+    image-rendering:pixelated;
+  }
+  canvas#scene {
+    display:block;
+    width:min(480px, calc(100vw - 60px));
+    image-rendering:pixelated;
+    background:#000;
+  }
+  .hud {
+    width:min(504px, calc(100vw - 36px));
+    margin-top:12px;
+    background:var(--panel);
+    border:2px solid #2a3145;
+    padding:12px 14px;
+    display:flex; flex-wrap:wrap; gap:10px; align-items:center; justify-content:center;
+  }
+  button {
+    font-family:inherit; font-size:11px; letter-spacing:2px; text-transform:uppercase;
+    background:#232b3d; color:#d8dce6;
+    border:2px solid #3a4560; padding:8px 12px; cursor:pointer;
+  }
+  button:hover { background:#2c3650; border-color:var(--amber); }
+  button.amber { border-color:var(--amber); color:var(--amber); }
+  .counter {
+    display:flex; align-items:center; gap:8px;
+    font-size:12px; letter-spacing:2px; text-transform:uppercase;
+  }
+  .dot {
+    width:12px; height:12px; background:var(--lamp); border:2px solid #0a0d13;
+    box-shadow:0 0 8px 2px rgba(255,215,106,.0); transition:box-shadow .3s;
+  }
+  .dot.lit { box-shadow:0 0 10px 3px rgba(255,215,106,.8); }
+  #trafficN { color:var(--lamp); font-size:16px; min-width:2ch; text-align:center; }
+  .wire {
+    width:min(504px, calc(100vw - 36px));
+    margin-top:10px; padding:10px 14px;
+    background:var(--panel2); border:2px dashed #2a3145;
+    font-size:11px; line-height:1.7; color:#8a92a6;
+  }
+  .wire code { color:var(--cody); }
+  .wire .k { color:var(--amber); }
+</style>
+</head>
+<body>
+
+<h1>Market Lane</h1>
+<div class="sub"><span class="cody">← Bay Area</span> · <span class="rose">Warm &amp; Alive</span> · <span class="amber">Midtown →</span></div>
+
+<div class="frame"><canvas id="scene" width="480" height="560"></canvas></div>
+
+<div class="hud">
+  <div class="counter"><div class="dot" id="hudDot"></div> Foot Traffic <span id="trafficN">0</span></div>
+  <button id="btnWalker" class="amber">+ Walker</button>
+  <button id="btnRush">Rush Hour</button>
+  <button id="btnNight">Day</button>
+  <button id="btnRain">Shower</button>
+</div>
+
+<div class="wire">
+  <span class="k">WORKING THE LANE</span> — the sprite exposes a tiny API for
+  <code>/city/traffic</code>: call <code>marketLane.setTraffic(n)</code> directly, or
+  <code>marketLane.connect('/city/traffic', 15000)</code> to poll a JSON endpoint
+  (reads <code>traffic</code>, <code>count</code>, or <code>agents</code>). Also:
+  <code>setNight(bool)</code>, <code>setRain(bool)</code> — Columbia weather, showers
+  arrive unannounced. Five doors: the Kettle, the Proof, Spine &amp; Signal,
+  the Stem, the Lantern Bowl.
+</div>
+
+<script>
+/* ============================================================
+   MARLA CITY MARKET LANE — hand-pixeled 80×46 shopfront row
+   Bay Area ⇄ Midtown. Five doors:
+     The Kettle (coffee) · The Proof (bakery) · Spine & Signal
+     (books) · The Stem (flowers) · The Lantern Bowl (noodles)
+   Legend:  M/m plaster  B/b brick  Q/q bluestone  P/p sage
+            D/d dark wood  R/r V/v A/a C/c O/o awning stripes
+            K ink  k drainpipe  W window  G door glass  F door
+            L lamp gold (glows)  N stone  S/s slate  . transparent
+   ============================================================ */
+const SPRITE = [
+"................................................................................",
+"................................................................................",
+"................................................................................",
+"................................................................................",
+"................................................ksssssssssssssss................",
+"................................................kPPPPPPPPPPPPPPP................",
+"................................................kPPKKKKPPPKKKKpP................",
+"................ksssssssssssssss................kPPKWWKPPPKWWKPP................",
+"................kBBBBBBBBBBBBBBB................kPPKWWKpPPKWWKPP...Ss...........",
+"................kBBKKKKBBBKKKKBB................kPPKWWKPPPKWWKPp...Ss...........",
+"................kBBKWWKBbBKWWKBB................kpPKKKKPPPKKKKPPksssssssssssssss",
+"..........Ss....kBBKWWKBBBKWWKBb................kPPPPppPpPPPpPPPkDdDDdDDDDDDDDDD",
+"..........Ss....kBBKWWKBBBKWWKBb................kPPKKKKPPPKKKKpPkDDKKKKdDDKKKKDD",
+"kssssssssssssssskBBKKKKBBBKKKKBB................kPPKWWKPPPKWWKPpkDDKWWKDDdKWWKDD",
+"kMMMMMMmMmMMMMMMkBBBBBBBBbBBBBBB................kPpKWWKpPPKWWKPPkDDKWWKDDDKWWKDD",
+"kMmKKKKMMMKKKKMMkBBKKKKbBBKKKKBB................kPPKWWKPPpKWWKPPkdDKWWKDDDKWWKDd",
+"kMmKWWKMMMKWWKMMkBbKWWKBBbKWWKBBkssssssssssssssskPpKKKKPPPKKKKPPkDDKKKKdDDKKKKDD",
+"kmMKWWKMMmKWWKMMkbBKWWKBBBKWWKBBkqQQQQQQQQQQQQQQkPpPPPPPppPPPPPPkDDDdDDDDdDDDDDD",
+"kMMKWWKMMMKWWKMmkBBKWWKBBBKWWKBBkQQKKKKQQQKKKKQQkPpKKKKPPPKKKKPPkDDKKKKDDDKKKKDD",
+"kMMKKKKMMMKKKKmMkBbKKKKBBBKKKKBBkQQKWWKQQQKWWKqQkPPKWWKPPPKWWKPPkDdKWWKDDdKWWKdd",
+"kMmMMMmMMMMMMMMmkBBBBBBBBBBBBBBBkQQKWWKQqQKWWKQqkpPKWWKPPPKWWKPPkDDKWWKDDDKWWKDd",
+"kMmKKKKMMMKKKKMMkBBKKKKbBBKKKKBBkqQKWWKQQQKWWKqQkPPKWWKPPPKWWKPPkDDKWWKDDDKWWKDD",
+"kMMKWWKMMMKWWKMMkBBKWWKBBBKWWKbBkQQKKKKQQQKKKKQQkPPKKKKPPPKKKKPPkDDKKKKdDdKKKKDD",
+"kmMKWWKMmMKWWKMMkBBKWWKBBbKWWKBBkqqQQQQQQqQqQQQQkPPPPPPPPPPPPpPPkDDDDDDDDDDDDDDD",
+"kMMKWWKMMMKWWKmMkBBKWWKBBbKWWKBBkQQqQQQqQQQQqQQqkPPPppPPPPPPPPpPkdDDdDDDDDdDDDDD",
+"kMMKKKKMMMKKKKmMkBBKKKKBBBKKKKBBkQQQQQQQQQQqQqQQkPPPpPPPppPPPPpPkDDdDdDDDDDDDDDD",
+"kMMMMMMMMMMmMMmMkBbbBBbBBBBBBBBBkqQQQQQQQqQQQQQQkPpPPPPpPPPPPPPPkDDDDdDDDDDDDdDD",
+"kDDDDDLLLLDDDDDDkAAAAAAAAAAAAAAAkDDDDDCCDCCDDDDDkAAAAAAARAAAAAAAkKKKKKKLKLKKKKKK",
+"kDDDDDLDDLLDDDDDkAAAAAAKKKAAAAAAkDDDDDCDCDCDDDDDkAAAAAARRRAAAAAAkKKKKKKKKKKKKLLK",
+"kDDDDDLDDLDDDDDDkAAAAAKKKKKAAAAAkDDDDDCDCDCDDDDDkAAAAARARARAAAAAkKKKKKLLLLLKKLLK",
+"kDDDDDDLLLDDDDDDkAAAAAKAKAKAAAAAkDDDDDCCCCCDDDDDkAAAAAAARAAAAAAAkKKKKKKLLLKKKKKK",
+"kRrrRRrrRRrrRRrrkVvvVVvvVVvvVVvvkAaaAAaaAAaaAAaakCccCCccCCccCCcckOooOOooOOooOOoo",
+"kRrrRRrrRRrrRRrrkVvvVVvvVVvvVVvvkAaaAAaaAAaaAAaakCccCCccCCccCCcckOooOOooOOooOOoo",
+"krmmRrmmRrmmRrmmkvbbVvbbVvbbVvbbkaqqAaqqAaqqAaqqkcppCcppCcppCcppkoddOoddOoddOodd",
+"kMKKKKKKMMKKKKMMkBKKKKKKBBKKKKBBkqKKKKKKQQKKKKQQkPKKKKKKPPKKKKPPkDKKKKKKDDKKKKDD",
+"kmKWWWWKMMKGGKmMkBKWWWWKBBKGGKBbkQKWWWWKQQKGGKQQkPKWWWWKPPKGGKPPkDKWWWWKDDKGGKDD",
+"kMKWWWWKMMKGGKMMkBKWWWWKBBKGGKBBkQKWWWWKQQKGGKQQkPKWWWWKPPKGGKPPkDKWWWWKDdKGGKdD",
+"kmKWWWWKMMKGGKmMkBKWWWWKBBKGGKBBkQKWWWWKQQKGGKQQkPKWWWWKPPKGGKPPkdKWWWWKDDKGGKDD",
+"kmKWWWWKMMKGGKMMkBKWWWWKBBKGGKBBkQKWWWWKQQKGGKQqkPKWWWWKPpKGGKPPkDKWWWWKDDKGGKdD",
+"kMKWWWWKMMKFFKMMkBKWWWWKbBKFFKBBkQKWWWWKQqKFFKQQkPKWWWWKPPKFFKPPkDKWWWWKDDKFFKdD",
+"kMKWWWWKMMKFFKMMkbKWWWWKBBKFFKBbkQKWWWWKQQKFFKQqkPKWWWWKPPKFFKPPkDKWWWWKdDKFFKDD",
+"kMKWWWWKmMKFFKMMkBKWWWWKBBKFFKBBkQKWWWWKQQKFFKQQkPKWWWWKPPKFFKPPkDKWWWWKDDKFFKDD",
+"kmKWWWWKMMKFFKMMkBKWWWWKBBKFFKBbkQKWWWWKQQKFFKQQkPKWWWWKPPKFFKPPkDKWWWWKDDKFFKDD",
+"kMKKKKKKMMKFFKMMkBKKKKKKBBKFFKBBkQKKKKKKQQKFFKQQkPKKKKKKpPKFFKPPkDKKKKKKDDKFFKDD",
+"kmmmmmmmmmmmmmmmkbbbbbbbbbbbbbbbkqqqqqqqqqqqqqqqkpppppppppppppppkddddddddddddddd",
+"kNNNNNNNNNNNNNNNkNNNNNNNNNNNNNNNkNNNNNNNNNNNNNNNkNNNNNNNNNNNNNNNkNNNNNNNNNNNNNNN",
+];
+const SW = 80, SH = 46;
+
+/* Palette. W and G resolve per day/night mode. */
+const PAL = {
+  K:[23,19,26],   k:[16,20,28],
+  M:[176,141,98], m:[143,111,76],
+  B:[122,70,54],  b:[94,53,42],
+  Q:[70,83,107],  q:[52,62,82],
+  P:[169,179,160],p:[135,146,126],
+  D:[74,53,39],   d:[54,39,29],
+  R:[178,58,107], r:[138,43,82],
+  V:[93,160,90],  v:[67,122,65],
+  A:[232,168,76], a:[185,127,51],
+  C:[79,180,230], c:[58,143,192],
+  O:[217,123,74], o:[178,92,51],
+  F:[58,37,29],   N:[86,91,102],
+  S:[61,74,97],   s:[31,37,49],
+  L:[255,215,106],
+};
+const GLASS = {
+  night: { W:[255,200,120], G:[255,224,150] },
+  day:   { W:[168,190,210], G:[196,214,228] },
+};
+
+/* ---------------- state ---------------- */
+const state = { traffic:0, night:true, rain:false, t:0 };
+const MAX_TRAFFIC = 20;
+
+/* ---------------- scene layout ---------------- */
+const scene = document.getElementById('scene');
+const ctx = scene.getContext('2d');
+const SCALE = 6;
+const SX = 0, SY = 160;                  // sprite fills the width
+const WALK_Y = 436;                      // sidewalk top (sprite bottom)
+const CURB_Y = 466;                      // curb line
+const STREET_Y = 470;                    // cobbles begin
+
+/* offscreen: raw 80x46 sprite pixels */
+const spriteCv = document.createElement('canvas');
+spriteCv.width = SW; spriteCv.height = SH;
+const spriteCtx = spriteCv.getContext('2d');
+const img = spriteCtx.createImageData(SW, SH);
+
+/* offscreen: sky + skyline + shops (background world) */
+const worldCv = document.createElement('canvas');
+worldCv.width = 480; worldCv.height = WALK_Y;
+const wctx = worldCv.getContext('2d');
+
+/* stars */
+const stars = Array.from({length:46}, () => ({
+  x: Math.random()*480, y: Math.random()*140,
+  s: Math.random() < .18 ? 2 : 1, p: Math.random()*Math.PI*2,
+}));
+
+/* steam: the Kettle's roaster chimney + the Lantern Bowl's vent */
+const EMITTERS = [ {x:66, y:228}, {x:406, y:212} ];
+const puffs = [];
+let puffClock = 0;
+
+/* string lights across the lane, awning to awning */
+const LIGHT_ANCHORS = [3, 99, 195, 291, 387, 477];
+const LIGHT_Y = 346;
+
+/* rain */
+const drops = Array.from({length:90}, () => ({
+  x: Math.random()*560-40, y: Math.random()*560, v: 380+Math.random()*160, l: 8+Math.random()*7,
+}));
+const PUDDLES = [ [58,500,72,9], [246,528,92,11], [388,486,56,8] ];
+
+/* walkers — the lane's foot traffic */
+const COATS = [
+  [79,180,230],[232,168,76],[178,58,107],[127,224,178],
+  [176,141,98],[93,160,90],[216,225,255],[217,123,74],
+];
+const SKINS = [[232,195,154],[198,142,95],[138,90,59],[92,58,36]];
+const PAUSE_ZONES = [ {x:75, w:12}, {x:420, w:12} ];
+let walkers = [];
+function spawnWalker(seed) {
+  const dir = Math.random() < .5 ? 1 : -1;
+  return {
+    x: dir > 0 ? -16 - Math.random()*90 : 496 + Math.random()*90,
+    dir,
+    lane: 448 + Math.random()*18,          /* feet y; deeper = drawn later */
+    spd: 14 + Math.random()*22,
+    coat: COATS[(Math.random()*COATS.length)|0],
+    skin: SKINS[(Math.random()*SKINS.length)|0],
+    hat: Math.random() < .35,
+    ph: Math.random()*Math.PI*2,
+    pause: 0, cooldown: 2 + Math.random()*6,
+    leaving: false,
+  };
+}
+function updateWalkers(dt, t) {
+  while (walkers.length < state.traffic) walkers.push(spawnWalker());
+  let excess = walkers.length - state.traffic;
+  for (const w of walkers) {
+    if (excess > 0 && !w.leaving) { w.leaving = true; excess--; }
+  }
+  walkers = walkers.filter(w => {
+    if (w.pause > 0) { w.pause -= dt; return true; }
+    w.cooldown -= dt;
+    const hurry = state.rain ? 1.4 : 1;
+    w.x += w.dir * w.spd * hurry * dt;
+    if (w.cooldown <= 0 && !state.rain) {
+      for (const z of PAUSE_ZONES) {
+        if (Math.abs(w.x - z.x) < z.w && Math.random() < .012) {
+          w.pause = 1.5 + Math.random()*2;
+          w.cooldown = 8 + Math.random()*8;
+        }
+      }
+    }
+    if (w.x < -30 || w.x > 510) {
+      if (w.leaving) return false;               /* walked off to another district */
+      w.x = w.x < -30 ? 508 : -28;               /* or came back round the block */
+      w.dir = w.x < 0 ? 1 : -1;
+      w.lane = 448 + Math.random()*18;
+      w.spd = 14 + Math.random()*22;
+    }
+    return true;
+  });
+}
+function drawWalker(w, t) {
+  const n = state.night;
+  const yf = w.lane + 14;                        /* feet */
+  const x = Math.round(w.x);
+  const step = w.pause > 0 ? 0 : Math.sin(t*7 + w.ph);
+  const bob = w.pause > 0 ? Math.sin(t*2 + w.ph)*.6 : Math.abs(step)*1.4;
+  const dim = n ? .82 : 1;
+  const rgb = (c,f=1) => `rgb(${(c[0]*f*dim)|0},${(c[1]*f*dim)|0},${(c[2]*f*dim)|0})`;
+  /* legs */
+  ctx.fillStyle = rgb([40,44,58]);
+  ctx.fillRect(x-4 + step*2.4, yf-12, 3, 12);
+  ctx.fillRect(x+1 - step*2.4, yf-12, 3, 12);
+  /* coat */
+  ctx.fillStyle = rgb(w.coat);
+  ctx.fillRect(x-5, yf-30 - bob, 10, 19);
+  ctx.fillStyle = rgb(w.coat, .78);
+  ctx.fillRect(x-5 + (w.dir>0?7:0), yf-30 - bob, 3, 19);   /* shaded side */
+  /* head */
+  ctx.fillStyle = rgb(w.skin);
+  ctx.fillRect(x-3, yf-38 - bob, 6, 7);
+  if (w.hat) { ctx.fillStyle = rgb(w.coat, .6); ctx.fillRect(x-4, yf-40 - bob, 8, 3); }
+  /* a face, facing somewhere */
+  ctx.fillStyle = 'rgba(23,19,26,.85)';
+  ctx.fillRect(x + (w.dir>0?1:-2), yf-36 - bob, 1, 2);
+}
+
+/* ---------------- sprite raster ---------------- */
+function renderSprite(t) {
+  const d = img.data;
+  d.fill(0);
+  const glass = GLASS[state.night ? 'night' : 'day'];
+  const pulse = Math.sin(t*2.4)*.5 + .5;
+
+  const put = (x, y, rgb, boost=0) => {
+    const i = (y*SW + x)*4;
+    d[i]   = Math.min(255, rgb[0] + boost);
+    d[i+1] = Math.min(255, rgb[1] + boost*0.82);
+    d[i+2] = Math.min(255, rgb[2] + boost*0.45);
+    d[i+3] = 255;
+  };
+
+  for (let y=0; y<SH; y++) {
+    for (let x=0; x<SW; x++) {
+      const ch = SPRITE[y][x];
+      if (ch === '.') continue;
+      if (ch === 'W' || ch === 'G') { put(x, y, glass[ch]); continue; }
+      if (ch === 'L') {                          /* gold lamps breathe */
+        put(x, y, PAL.L, state.night ? pulse*70 : pulse*18);
+        continue;
+      }
+      put(x, y, PAL[ch]);
+    }
+  }
+  spriteCtx.putImageData(img, 0, 0);
+}
+
+/* ---------------- world (sky + skyline + shops) ---------------- */
+function renderWorld(t) {
+  const n = state.night;
+
+  /* sky — heavier and lower when a shower rolls in */
+  const sky = wctx.createLinearGradient(0, 0, 0, WALK_Y);
+  if (n) { sky.addColorStop(0,'#0a0e1c'); sky.addColorStop(.65,'#141b30'); sky.addColorStop(1,'#1d2438'); }
+  else if (state.rain) { sky.addColorStop(0,'#5c7591'); sky.addColorStop(.7,'#8299ad'); sky.addColorStop(1,'#9fb0bd'); }
+  else   { sky.addColorStop(0,'#7ec3e8'); sky.addColorStop(.7,'#b8dcef'); sky.addColorStop(1,'#d9ebf4'); }
+  wctx.fillStyle = sky;
+  wctx.fillRect(0, 0, 480, WALK_Y);
+
+  if (n) {
+    for (const st of stars) {
+      const tw = .45 + .55 * Math.abs(Math.sin(t*1.3 + st.p));
+      wctx.fillStyle = `rgba(216,225,255,${state.rain ? tw*.3 : tw})`;
+      wctx.fillRect(st.x|0, st.y|0, st.s, st.s);
+    }
+    wctx.fillStyle = '#e8ecf7';                  /* moon */
+    wctx.fillRect(228, 40, 22, 22);
+    wctx.fillStyle = '#c6cde3';
+    wctx.fillRect(232, 46, 6, 6); wctx.fillRect(240, 52, 4, 4);
+    wctx.fillStyle = '#0a0e1c';
+    wctx.fillRect(224, 36, 8, 8);
+  } else if (!state.rain) {
+    wctx.fillStyle = '#fff3c2';                  /* sun */
+    wctx.fillRect(226, 42, 20, 20);
+    wctx.fillStyle = 'rgba(255,243,194,.35)';
+    wctx.fillRect(220, 48, 32, 8); wctx.fillRect(232, 36, 8, 32);
+  }
+  /* Columbia clouds — big, humid, moving */
+  const ca = n ? .10 : (state.rain ? .55 : .75);
+  wctx.fillStyle = `rgba(${state.rain ? '96,110,128' : '255,255,255'},${ca})`;
+  const cx1 = (t*7) % 620 - 70, cx2 = (t*4.6 + 300) % 620 - 70;
+  wctx.fillRect(cx1, 64, 64, 9); wctx.fillRect(cx1+14, 55, 36, 9);
+  wctx.fillRect(cx2, 108, 52, 8); wctx.fillRect(cx2+12, 100, 28, 8);
+
+  /* Bay Area rises to the west (cool), Midtown to the east (tall, amber) */
+  wctx.fillStyle = n ? '#0f1526' : '#9fb8cc';
+  const bay = [[0,34,300],[30,26,282],[58,38,308],[100,24,318]];
+  for (const [x,w,yTop] of bay) wctx.fillRect(x, yTop, w, WALK_Y - yTop);
+  wctx.fillStyle = n ? '#131a30' : '#a8b4c4';
+  const mid = [[352,30,262],[380,26,240],[404,40,270],[446,34,252]];
+  for (const [x,w,yTop] of mid) wctx.fillRect(x, yTop, w, WALK_Y - yTop);
+  if (n) {
+    wctx.fillStyle = 'rgba(79,180,230,.5)';      /* Cody's windows */
+    for (let i=0;i<7;i++) wctx.fillRect(6+(i*31)%110, 292+(i*47)%120, 2, 2);
+    wctx.fillStyle = 'rgba(232,168,76,.55)';     /* Midtown burning late */
+    for (let i=0;i<9;i++) wctx.fillRect(356+(i*29)%116, 250+(i*53)%160, 2, 2);
+  }
+
+  /* the shopfronts */
+  wctx.imageSmoothingEnabled = false;
+  wctx.drawImage(spriteCv, SX, SY, SW*SCALE, SH*SCALE);
+
+  /* warm spill from the windows at night */
+  if (n) {
+    wctx.fillStyle = 'rgba(255,200,120,.05)';
+    wctx.fillRect(0, SY+200, 480, 76);
+  }
+
+  /* steam off the Kettle's roaster and the Bowl's vent */
+  for (const p of puffs) {
+    const a = Math.max(0, (1 - p.age/p.life)) * (n ? .34 : .26);
+    const s = 3 + p.age*3.2;
+    wctx.fillStyle = `rgba(226,232,240,${a})`;
+    wctx.fillRect(p.x + Math.sin(p.age*2 + p.sw)*4 - s/2, p.y - s/2, s, s);
+  }
+
+  /* string lights, swaying between the awnings */
+  for (let i=0; i<LIGHT_ANCHORS.length-1; i++) {
+    const x0 = LIGHT_ANCHORS[i], x1 = LIGHT_ANCHORS[i+1];
+    const sag = 9 + Math.sin(t*.7 + i)*1.4;
+    let bulb = 0;
+    for (let x=x0; x<=x1; x+=6) {
+      const u = (x - x0) / (x1 - x0);
+      const yw = LIGHT_Y + Math.sin(Math.PI*u) * sag;
+      wctx.fillStyle = 'rgba(23,19,26,.8)';
+      wctx.fillRect(x, yw, 6, 1);
+      if (bulb++ % 3 === 1) {
+        if (n) {
+          const fl = .55 + .25*Math.sin(t*3 + x*.8);
+          const g = wctx.createRadialGradient(x, yw+2, 0, x, yw+2, 7);
+          g.addColorStop(0, `rgba(255,215,106,${fl})`);
+          g.addColorStop(1, 'rgba(255,215,106,0)');
+          wctx.fillStyle = g;
+          wctx.fillRect(x-7, yw-5, 14, 14);
+          wctx.fillStyle = '#ffd76a';
+        } else {
+          wctx.fillStyle = '#4a5266';
+        }
+        wctx.fillRect(x-1, yw+1, 2, 3);
+      }
+    }
+  }
+
+  /* humid haze off the pavement */
+  const hz = wctx.createLinearGradient(0, 380, 0, WALK_Y);
+  hz.addColorStop(0, 'rgba(215,190,150,0)');
+  hz.addColorStop(1, `rgba(215,190,150,${n ? .04 : .07})`);
+  wctx.fillStyle = hz;
+  wctx.fillRect(0, 380, 480, WALK_Y-380);
+}
+
+/* ---------------- main frame ---------------- */
+let lastMs = 0;
+function frame(ms) {
+  const t = ms/1000; const dt = Math.min(.05, (ms-lastMs)/1000 || .016); lastMs = ms;
+  state.t = t;
+
+  /* steam emission */
+  puffClock += dt;
+  if (puffClock > .33) {
+    puffClock = 0;
+    for (const e of EMITTERS) puffs.push({ x:e.x, y:e.y, age:0, life:2.6, sw:Math.random()*6 });
+  }
+  for (const p of puffs) { p.age += dt; p.y -= 13*dt; }
+  while (puffs.length && puffs[0].age > puffs[0].life) puffs.shift();
+
+  updateWalkers(dt, t);
+  renderSprite(t);
+  renderWorld(t);
+
+  ctx.imageSmoothingEnabled = false;
+  ctx.clearRect(0, 0, 480, 560);
+  ctx.drawImage(worldCv, 0, 0);
+
+  const n = state.night;
+
+  /* ------ sidewalk ------ */
+  ctx.fillStyle = n ? '#3a4150' : '#8b93a0';
+  ctx.fillRect(0, WALK_Y, 480, CURB_Y-WALK_Y);
+  ctx.fillStyle = n ? '#2e3442' : '#767e8c';
+  for (let x=24; x<480; x+=48) ctx.fillRect(x, WALK_Y, 1, CURB_Y-WALK_Y);
+  ctx.fillStyle = n ? '#262b38' : '#616876';
+  ctx.fillRect(0, CURB_Y, 480, STREET_Y-CURB_Y);
+
+  /* district signposts */
+  ctx.fillStyle = '#2a2f3c';
+  ctx.fillRect(8, WALK_Y-24, 2, 24); ctx.fillRect(468, WALK_Y-24, 2, 24);
+  ctx.fillStyle = '#4fb4e6'; ctx.fillRect(2, WALK_Y-32, 14, 9);
+  ctx.fillStyle = '#e8a84c'; ctx.fillRect(462, WALK_Y-32, 14, 9);
+  ctx.fillStyle = '#17131a';
+  ctx.fillRect(4, WALK_Y-28, 8, 1);  ctx.fillRect(4, WALK_Y-28, 3, 3);      /* ← */
+  ctx.fillRect(468, WALK_Y-28, 8, 1); ctx.fillRect(473, WALK_Y-28, 3, 3);   /* → */
+
+  /* ------ the street ------ */
+  ctx.fillStyle = n ? '#232937' : '#59616e';
+  ctx.fillRect(0, STREET_Y, 480, 560-STREET_Y);
+  for (let y=STREET_Y, row=0; y<560; y+=6, row++) {
+    for (let x=(row%2)*6; x<480; x+=12) {
+      const v = (Math.sin(x*12.9898 + y*78.233)*43758.5453) % 1;
+      ctx.fillStyle = n
+        ? (v > 0 ? 'rgba(140,160,200,.05)' : 'rgba(10,13,19,.22)')
+        : (v > 0 ? 'rgba(255,255,255,.07)' : 'rgba(10,13,19,.16)');
+      ctx.fillRect(x, y, 10, 4);
+    }
+  }
+  /* standing water — it rained an hour ago, or it's about to */
+  for (const [px,py,pw,ph] of PUDDLES) {
+    ctx.fillStyle = n ? 'rgba(90,120,180,.18)' : 'rgba(160,190,215,.30)';
+    ctx.fillRect(px, py, pw, ph);
+    ctx.fillStyle = n ? 'rgba(255,215,106,.14)' : 'rgba(255,255,255,.30)';
+    const sh = Math.sin(t*1.8 + px)*pw*.2;
+    ctx.fillRect(px+pw/2+sh-4, py+1, 8, 1);
+  }
+
+  /* ------ foot traffic ------ */
+  walkers.sort((a,b) => a.lane - b.lane);
+  for (const w of walkers) drawWalker(w, t);
+
+  /* ------ the shower ------ */
+  if (state.rain) {
+    ctx.fillStyle = n ? 'rgba(10,14,26,.12)' : 'rgba(30,40,58,.14)';
+    ctx.fillRect(0, 0, 480, 560);
+    const wind = Math.sin(t*.25)*24 - 34;
+    ctx.strokeStyle = 'rgba(185,205,235,.45)';
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    for (const dr of drops) {
+      dr.y += dr.v * dt; dr.x += wind * dt;
+      if (dr.y > 560) { dr.y = -12; dr.x = Math.random()*560-30; }
+      const k = dr.l / dr.v;
+      ctx.moveTo(dr.x, dr.y);
+      ctx.lineTo(dr.x + wind*k, dr.y + dr.l);
+    }
+    ctx.stroke();
+    ctx.fillStyle = 'rgba(200,220,240,.28)';
+    for (let i=0;i<10;i++) {
+      const sx = (Math.sin(t*9 + i*37)*.5+.5)*480;
+      const sy = STREET_Y + (Math.sin(t*7 + i*53)*.5+.5)*(560-STREET_Y);
+      ctx.fillRect(sx, sy, 2, 1);
+    }
+  }
+
+  requestAnimationFrame(frame);
+}
+requestAnimationFrame(frame);
+
+/* ---------------- controls & public API ---------------- */
+const $ = id => document.getElementById(id);
+function refreshHud() {
+  $('trafficN').textContent = state.traffic;
+  $('hudDot').classList.toggle('lit', state.traffic > 0);
+  $('btnNight').textContent = state.night ? 'Day' : 'Night';
+  $('btnRain').textContent = state.rain ? 'Clear Skies' : 'Shower';
+  $('btnRush').textContent = state.traffic >= 12 ? 'Quiet Hour' : 'Rush Hour';
+}
+$('btnWalker').onclick = () => { state.traffic = Math.min(MAX_TRAFFIC, state.traffic+1); refreshHud(); };
+$('btnRush').onclick   = () => { state.traffic = state.traffic >= 12 ? 3 : 14; refreshHud(); };
+$('btnNight').onclick  = () => { state.night = !state.night; refreshHud(); };
+$('btnRain').onclick   = () => { state.rain = !state.rain; refreshHud(); };
+
+/* Public API — wire to /city/traffic when the endpoint is live:
+     marketLane.connect('/city/traffic', 15000)
+   expects JSON like {traffic: 9} (or {count: 9} / {agents: 9}). */
+let pollTimer = null;
+window.marketLane = {
+  setTraffic(nn) { state.traffic = Math.max(0, Math.min(MAX_TRAFFIC, nn|0)); refreshHud(); },
+  getTraffic()   { return state.traffic; },
+  setNight(v)    { state.night = !!v; refreshHud(); },
+  setRain(v)     { state.rain = !!v; refreshHud(); },
+  connect(url, ms=15000) {
+    const poll = () => fetch(url)
+      .then(r => r.json())
+      .then(d => this.setTraffic(d.traffic ?? d.count ?? d.agents ?? 0))
+      .catch(() => {});
+    poll();
+    clearInterval(pollTimer);
+    pollTimer = setInterval(poll, ms);
+    return () => clearInterval(pollTimer);
+  },
+};
+refreshHud();
+</script>
+<script>
+/* Postcard edition — snapshot of July 19, 2026. No live wire: the city keeps its own counsel. */
+marketLane.setTraffic(7);
+</script>
+</body>
+</html>

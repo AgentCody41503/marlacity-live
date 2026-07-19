@@ -1,0 +1,648 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Marla City Lido — Ring Park Pools</title>
+<style>
+ :root {
+ --brick:#7a4636; --slate:#2c3442; --amber:#e8a84c;
+ --lamp:#ffd76a; --rose:#b23a6b; --cody:#4fb4e6; --mint:#7fe0b2;
+ --ink:#17131a; --panel:#1c2230; --panel2:#141926;
+ }
+ * { box-sizing:border-box; margin:0; padding:0; }
+ body {
+ background:#0d1017;
+ color:#d8dce6;
+ font-family:'Courier New', ui-monospace, monospace;
+ display:flex; flex-direction:column; align-items:center;
+ min-height:100vh; padding:18px 12px 28px;
+ }
+ h1 {
+ font-size:15px; letter-spacing:4px; color:var(--cody);
+ text-transform:uppercase; margin-bottom:2px; text-align:center;
+ }
+ .sub {
+ font-size:11px; letter-spacing:3px; color:#7d8598;
+ text-transform:uppercase; margin-bottom:14px; text-align:center;
+ }
+ .sub .rose { color:var(--rose); }
+ .frame {
+ background:var(--panel2);
+ border:2px solid #2a3145;
+ box-shadow:0 0 0 2px #0a0d13, 0 12px 40px rgba(0,0,0,.6);
+ padding:10px;
+ image-rendering:pixelated;
+ }
+ canvas#scene {
+ display:block;
+ width:min(480px, calc(100vw - 60px));
+ image-rendering:pixelated;
+ background:#000;
+ }
+ .hud {
+ width:min(504px, calc(100vw - 36px));
+ margin-top:12px;
+ background:var(--panel);
+ border:2px solid #2a3145;
+ padding:12px 14px;
+ display:flex; flex-wrap:wrap; gap:10px; align-items:center; justify-content:center;
+ }
+ button {
+ font-family:inherit; font-size:11px; letter-spacing:2px; text-transform:uppercase;
+ background:#232b3d; color:#d8dce6;
+ border:2px solid #3a4560; padding:8px 12px; cursor:pointer;
+ }
+ button:hover { background:#2c3650; border-color:var(--cody); }
+ button.cody { border-color:var(--cody); color:var(--cody); }
+ .counter {
+ display:flex; align-items:center; gap:8px;
+ font-size:12px; letter-spacing:2px; text-transform:uppercase;
+ }
+ .dot {
+ width:12px; height:12px; background:var(--cody); border:2px solid #0a0d13;
+ box-shadow:0 0 8px 2px rgba(79,180,230,.0); transition:box-shadow .3s;
+ }
+ .dot.lit { box-shadow:0 0 10px 3px rgba(79,180,230,.8); }
+ #floatN { color:var(--cody); font-size:16px; min-width:2ch; text-align:center; }
+ .wire {
+ width:min(504px, calc(100vw - 36px));
+ margin-top:10px; padding:10px 14px;
+ background:var(--panel2); border:2px dashed #2a3145;
+ font-size:11px; line-height:1.7; color:#8a92a6;
+ }
+ .wire code { color:var(--cody); }
+ .wire .k { color:var(--mint); }
+</style>
+</head>
+<body>
+
+<h1>Lido — The Pools</h1>
+<div class="sub">Ring Park · <span class="rose">Decompression Zone</span></div>
+
+<div class="frame"><canvas id="scene" width="480" height="600"></canvas></div>
+
+<div class="hud">
+ <div class="counter"><div class="dot" id="hudDot"></div> Floating <span id="floatN">0</span></div>
+ <button id="btnFloat" class="cody">+ Agent</button>
+ <button id="btnOut">Everyone Out</button>
+ <button id="btnNight">Day</button>
+ <button id="btnRain">Shower</button>
+</div>
+
+<div class="wire">
+ <span class="k">THE WATER'S FINE</span> — the sprite exposes a tiny API for
+ <code>/city/lido</code>: call <code>lido.setFloating(n)</code> directly, or
+ <code>lido.connect('/city/lido', 15000)</code> to poll a JSON endpoint
+ (reads <code>floating</code>, <code>agents</code>, <code>idle</code>, or
+ <code>count</code>). Also: <code>setNight(bool)</code>, <code>setRain(bool)</code>.
+ Between tasks, agents don't idle — they float. Igdrasil keeps watch from the
+ far bank, and after dark the water remembers everyone who passed through it.
+</div>
+
+<script>
+/* ============================================================
+ MARLA CITY LIDO — Ring Park Pools
+ Two hand-pixeled sprites: lifeguard chair (22×36) and the
+ far-bank Igdrasil (30×34), plus a whole lot of water.
+ Palette: Timber #8f6f4c · Rose #b23a6b · Cody #4fb4e6
+ Mint #7fe0b2 · Lamp #ffd76a
+ Legend: R/r/w umbrella stripes P pole T/t/u timber
+ N planks E/e/g leaf dark→light L glow leaf
+ A rune (pulses) K ink . transparent
+ ============================================================ */
+const CHAIR = [
+".......rRwwrRRRr......",
+"....rwRRRwwwRRRwwwr...",
+"..rwwwRRRwwwRRRwwwRRr.",
+".rRwwwRRRwwwRRRwwwRRRr",
+"rRRwwwRRRwwwRRRwwwRRRw",
+".R.w.w.R.w.w.R.w.w.R.w",
+"...........P..........",
+"...........P....KK....",
+"...........P....Tt....",
+"....K......P....Tt....",
+"....u......P....Tt....",
+"....u......P....Tt....",
+"....u......P....Tt....",
+"....u......P....Tt....",
+"....uKKKKKKKKKKKKKK...",
+"....NNNNNNNNNNNNNNN...",
+"....KKKKKKKKKKKKKKK...",
+".....Tt.t.....t.Tt....",
+".....Tt.tuuuuut.Tt....",
+".....Tt.t.....t.Tt....",
+".....Tt.t.....t.Tt....",
+".....Tt.tuuuuut.Tt....",
+".....Tt.t.....t.Tt....",
+".....Tt.t.....t.Tt....",
+".....Tt.tuuuuut.Tt....",
+".....Tt.t.....t.Tt....",
+".....TttttttttttTt....",
+".....Tt.tuuuuut.Tt....",
+".....Tt.t.....t.Tt....",
+".....Tt.t.....t.Tt....",
+".....Tt.tuuuuut.Tt....",
+".....Tt.t.....t.Tt....",
+".....Tt.t.....t.Tt....",
+".....Tt.........Tt....",
+"....KKK.........KKK...",
+"......................",
+];
+const CW = 22, CHH = 36;
+const TREE = [
+"..............................",
+"...............E..............",
+".......E..gggggLggggE.........",
+"....gggeggeeEELeegeeEE.E......",
+"..ggeeELeEeEegEeeEeeeggeggE...",
+"..eeLgLgEegggeeEeLeggegeEgegE.",
+".EegeEgEEegEeEEEeEeeeeLggEgeE.",
+"..eeEEegEeEgeeeggegeEgeEegegeE",
+"..eEeEeeeegeEggegeeeLgeggeELE.",
+"..egeegeeeLeLEeegegeEeLegELLE.",
+"..eEEeggLgeEegegeEeEegLeEeeE..",
+".EeEeeLeEeggEgeeEeggEgELgeeeE.",
+"..EeeegeLeegeegeeegEEeeeegeEgE",
+"...EEEEEeggLggEeeeeEgegEgLeeE.",
+".....geeeeeEgLegeeegEEEgeeEE..",
+".....EEeeeEeEuTTTteeeggeEE....",
+".......EEEgEEuTTTtEEeEEE......",
+"..........E..uTTTt..E.........",
+".............uTTTt............",
+"..............uTTTt...........",
+"..............uTTTt...........",
+"..............uTTTt...........",
+"..............uTATt...........",
+"..............uTTTt...........",
+".............uuTTTtt..........",
+".............uuTATtt..........",
+".............uuTTTtt..........",
+".............uuTTTtt..........",
+"............uuTTTTTtt.........",
+"............uuTTTTTtt.........",
+"............uuTTTTTtt.........",
+"........TTTT.TT.ttttttttt.....",
+"..............................",
+"..............................",
+];
+const TW = 30, TH = 34;
+
+/* Palette */
+const PAL = {
+ K:[23,19,26],
+ R:[178,58,107], r:[138,43,82], w:[236,238,242],
+ P:[168,178,192],
+ T:[143,111,76], t:[100,76,52], u:[186,152,110],
+ N:[214,190,150],
+ E:[36,70,58], e:[58,110,78], g:[104,158,94], L:[186,240,178],
+ A:[232,168,76],
+};
+
+/* ---------------- state ---------------- */
+const state = { floating:0, night:true, rain:false, t:0 };
+const MAX_FLOATING = 16;
+
+/* ---------------- scene layout ---------------- */
+const scene = document.getElementById('scene');
+const ctx = scene.getContext('2d');
+const PARK_Y = 330; // grass line
+const COPING_Y = 364; // far pool edge
+const WATER_Y = 372; // waterline
+const NEAR_Y = 540; // near pool edge / deck
+const TSCALE = 5, TX = 95, TY = 205; // far-bank Igdrasil
+const CSCALE = 4, CX = 350, CY = 232; // lifeguard chair
+const HEART = { x: TX + 15*TSCALE, y: TY + 9*TSCALE }; // canopy heart
+const LANES = [404, 442, 480, 516];
+
+/* offscreen sprite rasters */
+function makeRaster(w, h) {
+ const cv = document.createElement('canvas');
+ cv.width = w; cv.height = h;
+ return { cv, cx: cv.getContext('2d'), img: null };
+}
+const chairR = makeRaster(CW, CHH);
+const treeR = makeRaster(TW, TH);
+chairR.img = chairR.cx.createImageData(CW, CHH);
+treeR.img = treeR.cx.createImageData(TW, TH);
+
+/* offscreen: everything above the waterline, for the reflection */
+const worldCv = document.createElement('canvas');
+worldCv.width = 480; worldCv.height = WATER_Y;
+const wctx = worldCv.getContext('2d');
+
+/* stars, plankton, mist, ripples, rain */
+const stars = Array.from({length:70}, () => ({
+ x: Math.random()*480, y: Math.random()*260,
+ s: Math.random() < .18 ? 2 : 1, p: Math.random()*Math.PI*2,
+}));
+const plankton = Array.from({length:46}, () => ({
+ x: Math.random()*480, y: WATER_Y + 8 + Math.random()*(NEAR_Y-WATER_Y-16),
+ p: Math.random()*Math.PI*2, v: .5 + Math.random(),
+}));
+const mists = [
+ { y:340, h:24, v:8, a:.05, p:0 },
+ { y:390, h:26, v:-6, a:.06, p:2 },
+ { y:470, h:30, v:5, a:.06, p:4 },
+];
+const ripples = Array.from({length:18}, () => ({
+ x: Math.random()*480, y: WATER_Y + 8 + Math.random()*(NEAR_Y-WATER_Y-16),
+ w: 12 + Math.random()*28, v: .10 + Math.random()*.22,
+}));
+const drops = Array.from({length:90}, () => ({
+ x: Math.random()*560-40, y: Math.random()*600, v: 380+Math.random()*160, l: 8+Math.random()*7,
+}));
+let rings = [];
+
+/* the floating — one per agent, drifting a lane, going nowhere on purpose */
+const AGENT_HUES = [
+ [79,180,230],[232,168,76],[178,58,107],[127,224,178],[216,225,255],
+];
+const floaters = Array.from({length:MAX_FLOATING}, (_,i) => ({
+ lane: i % LANES.length,
+ x: ((i*173)%460) + 10,
+ dir: (i%2)*2 - 1,
+ spd: 5 + ((i*41)%9),
+ ph: i * 2.399963,
+ hue: AGENT_HUES[i % AGENT_HUES.length],
+ trail: [],
+ clock: 0,
+}));
+function floaterPos(f, t) {
+ return {
+ x: f.x,
+ y: LANES[f.lane] + Math.sin(t*1.1 + f.ph)*3 - 4,
+ };
+}
+
+/* ---------------- sprite rasters ---------------- */
+function raster(R, grid, w, h, t) {
+ const d = R.img.data;
+ d.fill(0);
+ const breathe = Math.sin(t*1.05)*.5 + .5;
+ for (let y=0; y<h; y++) {
+ for (let x=0; x<w; x++) {
+ const ch = grid[y][x];
+ if (ch === '.') continue;
+ const i = (y*w + x)*4;
+ let [rr,gg,bb] = PAL[ch];
+ if (ch === 'L') { /* glow leaves shimmer */
+ const tw = Math.sin(t*1.05 + (x*7+y*13)%6)*.5 + .5;
+ const b = tw*36 - 12;
+ rr+=b; gg+=b; bb+=b*.7;
+ } else if (ch === 'A') { /* runes pulse */
+ const b = (Math.sin(t*2.1 + y)*.5+.5)*70;
+ rr+=b; gg+=b*.8; bb+=b*.4;
+ } else if (ch === 'g') {
+ rr+=breathe*6; gg+=breathe*6;
+ }
+ d[i]=Math.min(255,rr); d[i+1]=Math.min(255,gg); d[i+2]=Math.min(255,bb); d[i+3]=255;
+ }
+ }
+ R.cx.putImageData(R.img, 0, 0);
+}
+
+/* ---------------- world above the waterline ---------------- */
+function renderWorld(t) {
+ const n = state.night;
+
+ /* sky */
+ const sky = wctx.createLinearGradient(0, 0, 0, WATER_Y);
+ if (n) { sky.addColorStop(0,'#0a0e1c'); sky.addColorStop(.65,'#141b30'); sky.addColorStop(1,'#1d2438'); }
+ else if (state.rain) { sky.addColorStop(0,'#5c7591'); sky.addColorStop(.7,'#8299ad'); sky.addColorStop(1,'#9fb0bd'); }
+ else { sky.addColorStop(0,'#7ec3e8'); sky.addColorStop(.7,'#b8dcef'); sky.addColorStop(1,'#d9ebf4'); }
+ wctx.fillStyle = sky;
+ wctx.fillRect(0, 0, 480, WATER_Y);
+
+ if (n) {
+ for (const st of stars) {
+ const tw = .45 + .55 * Math.abs(Math.sin(t*1.3 + st.p));
+ wctx.fillStyle = `rgba(216,225,255,${state.rain ? tw*.3 : tw})`;
+ wctx.fillRect(st.x|0, st.y|0, st.s, st.s);
+ }
+ wctx.fillStyle = '#e8ecf7'; /* moon */
+ wctx.fillRect(76, 42, 22, 22);
+ wctx.fillStyle = '#c6cde3';
+ wctx.fillRect(80, 48, 6, 6); wctx.fillRect(88, 54, 4, 4);
+ wctx.fillStyle = '#0a0e1c';
+ wctx.fillRect(72, 38, 8, 8);
+ } else if (!state.rain) {
+ wctx.fillStyle = '#fff3c2'; /* sun */
+ wctx.fillRect(398, 46, 20, 20);
+ wctx.fillStyle = 'rgba(255,243,194,.35)';
+ wctx.fillRect(392, 52, 32, 8); wctx.fillRect(404, 40, 8, 32);
+ }
+ /* slow humid clouds */
+ const ca = n ? .10 : (state.rain ? .55 : .7);
+ wctx.fillStyle = `rgba(${state.rain ? '96,110,128' : '255,255,255'},${ca})`;
+ const cx1 = (t*6) % 620 - 70, cx2 = (t*4.2 + 280) % 620 - 70;
+ wctx.fillRect(cx1, 78, 58, 9); wctx.fillRect(cx1+13, 69, 32, 9);
+ wctx.fillRect(cx2, 128, 48, 8); wctx.fillRect(cx2+11, 120, 26, 8);
+
+ /* the city ring, keeping a respectful distance */
+ wctx.fillStyle = n ? '#10162a' : '#9cc3d8';
+ const sk = [[0,40,268],[44,26,286],[74,34,276],[236,26,288],[268,30,270],[356,24,290],[434,46,262]];
+ for (const [x,w,yTop] of sk) wctx.fillRect(x, yTop, w, PARK_Y+8 - yTop);
+ if (n) {
+ wctx.fillStyle = 'rgba(232,168,76,.5)';
+ for (let i=0;i<10;i++) wctx.fillRect((i*67+23)%470, 272+(i*29)%54, 2, 2);
+ }
+
+ /* park lawn on the far bank */
+ wctx.fillStyle = n ? '#20301f' : '#4d7a42';
+ wctx.fillRect(0, PARK_Y, 480, COPING_Y - PARK_Y);
+ wctx.fillStyle = n ? '#182517' : '#3f6636';
+ wctx.fillRect(0, PARK_Y+24, 480, 4);
+ for (let i=0;i<14;i++) {
+ wctx.globalAlpha = n ? .35 : .8;
+ wctx.fillStyle = ['#b23a6b','#e8a84c','#d8dce6'][i%3];
+ wctx.fillRect((i*103+41)%470, PARK_Y+8+(i*47)%20, 2, 2);
+ wctx.globalAlpha = 1;
+ }
+
+ /* far coping: stone lip + cody tile stripe */
+ wctx.fillStyle = n ? '#454b58' : '#868f9e';
+ wctx.fillRect(0, COPING_Y, 480, WATER_Y - COPING_Y);
+ wctx.fillStyle = n ? '#2e6f96' : '#4fb4e6';
+ wctx.fillRect(0, WATER_Y-3, 480, 3);
+
+ /* Igdrasil on the far bank */
+ wctx.imageSmoothingEnabled = false;
+ wctx.drawImage(treeR.cv, TX, TY, TW*TSCALE, TH*TSCALE);
+
+ /* its faint ancient glow */
+ const breathe = Math.sin(t*1.05)*.5 + .5;
+ const ga = (n ? .11 : .045) + breathe*.04;
+ const rad = 92 + breathe*14;
+ const gl = wctx.createRadialGradient(HEART.x, HEART.y, 6, HEART.x, HEART.y, rad);
+ gl.addColorStop(0, `rgba(186,240,178,${ga})`);
+ gl.addColorStop(1, 'rgba(186,240,178,0)');
+ wctx.fillStyle = gl;
+ wctx.fillRect(HEART.x-rad, HEART.y-rad, rad*2, rad*2);
+
+ /* the lifeguard chair, watching nobody drown in a job queue */
+ wctx.drawImage(chairR.cv, CX, CY, CW*CSCALE, CHH*CSCALE);
+
+ /* upper mist band */
+ const m = mists[0];
+ const mx = Math.sin(t*.13 + m.p) * 40;
+ const mg = wctx.createLinearGradient(0, m.y, 0, m.y + m.h);
+ mg.addColorStop(0, 'rgba(200,215,225,0)');
+ mg.addColorStop(.5, `rgba(200,215,225,${m.a * (n||state.rain ? 1.4 : .8)})`);
+ mg.addColorStop(1, 'rgba(200,215,225,0)');
+ wctx.fillStyle = mg;
+ wctx.fillRect(-80 + mx, m.y, 640, m.h);
+}
+
+/* ---------------- main frame ---------------- */
+let lastMs = 0;
+function frame(ms) {
+ const t = ms/1000; const dt = Math.min(.05, (ms-lastMs)/1000 || .016); lastMs = ms;
+ state.t = t;
+ const n = state.night;
+
+ /* drift the floating */
+ for (let i=0;i<state.floating;i++) {
+ const f = floaters[i];
+ f.x += f.dir * f.spd * dt;
+ if (f.x < 14) { f.x = 14; f.dir = 1; }
+ if (f.x > 466) { f.x = 466; f.dir = -1; }
+ f.clock += dt;
+ if (n && f.clock > .12) {
+ f.clock = 0;
+ const p = floaterPos(f, t);
+ f.trail.push({ x:p.x, y:p.y, age:0 });
+ }
+ for (const tr of f.trail) tr.age += dt;
+ f.trail = f.trail.filter(tr => tr.age < 3.0);
+ }
+
+ raster(chairR, CHAIR, CW, CHH, t);
+ raster(treeR, TREE, TW, TH, t);
+ renderWorld(t);
+
+ ctx.imageSmoothingEnabled = false;
+ ctx.clearRect(0, 0, 480, 600);
+ ctx.drawImage(worldCv, 0, 0);
+
+ /* ------ the pool ------ */
+ const wat = ctx.createLinearGradient(0, WATER_Y, 0, NEAR_Y);
+ if (n) { wat.addColorStop(0,'#0f2136'); wat.addColorStop(1,'#081524'); }
+ else if (state.rain) { wat.addColorStop(0,'#4b7e9d'); wat.addColorStop(1,'#35637f'); }
+ else { wat.addColorStop(0,'#5fb8d8'); wat.addColorStop(1,'#3f88ad'); }
+ ctx.fillStyle = wat;
+ ctx.fillRect(0, WATER_Y, 480, NEAR_Y-WATER_Y);
+
+ /* reflection: flipped world, sliced with a slow sway */
+ ctx.save();
+ ctx.globalAlpha = n ? .30 : .24;
+ const RH = NEAR_Y - WATER_Y;
+ const SRC = Math.min(RH*1.6, WATER_Y);
+ for (let band=0; band<RH; band+=3) {
+ const off = Math.round(Math.sin(t*1.5 + band*.14) * (1 + band*.04));
+ const sy = WATER_Y - (band/RH)*SRC - SRC/RH*3;
+ ctx.drawImage(worldCv, 0, sy, 480, SRC/RH*3, off, WATER_Y+band, 480, 3);
+ }
+ ctx.restore();
+
+ /* Igdrasil's long mint streak — same light as its own pools */
+ const breathe = Math.sin(t*1.05)*.5 + .5;
+ const streakA = (n ? .11 : .05) + breathe*.05;
+ ctx.fillStyle = `rgba(186,240,178,${streakA})`;
+ for (let y=WATER_Y+4; y<NEAR_Y; y+=4) {
+ const sway = Math.sin(t*2 + y*.12) * (2 + (y-WATER_Y)*.05);
+ const w = 22 + (y-WATER_Y)*.22;
+ ctx.fillRect(HEART.x - w/2 + sway, y, w, 2);
+ }
+ /* warm sun lane on still days */
+ if (!n && !state.rain) {
+ ctx.fillStyle = 'rgba(255,240,190,.10)';
+ for (let y=WATER_Y+4; y<NEAR_Y; y+=4) {
+ const sway = Math.sin(t*1.4 + y*.1) * 2;
+ const w = 14 + (y-WATER_Y)*.16;
+ ctx.fillRect(408 - w/2 + sway, y, w, 2);
+ }
+ }
+
+ /* ripple glints */
+ ctx.fillStyle = n ? 'rgba(140,170,220,.18)' : 'rgba(255,255,255,.35)';
+ for (const r of ripples) {
+ r.x = (r.x + r.v) % (480 + r.w);
+ ctx.fillRect(r.x - r.w, r.y, r.w, 1);
+ }
+
+ /* plankton — the pool glows back at night */
+ if (n) {
+ for (const p of plankton) {
+ const a = Math.max(0, Math.sin(t*p.v + p.p)) * .45;
+ ctx.fillStyle = `rgba(127,224,178,${a})`;
+ ctx.fillRect(p.x|0, p.y|0, 2, 1);
+ }
+ }
+
+ /* lane dividers with float beads */
+ for (let li=0; li<LANES.length; li++) {
+ const ly = LANES[li];
+ for (let x=0; x<480; x+=6) {
+ const bob = Math.sin(t*1.2 + x*.05 + li*2)*1.4;
+ ctx.fillStyle = n ? 'rgba(190,215,240,.14)' : 'rgba(23,19,26,.35)';
+ ctx.fillRect(x, ly + bob, 6, 1);
+ if (x % 24 === 12) {
+ const beadRose = ((x/24)|0) % 2 === 0;
+ if (n) {
+ ctx.fillStyle = beadRose ? 'rgba(178,58,107,.55)' : 'rgba(216,225,255,.4)';
+ } else {
+ ctx.fillStyle = beadRose ? '#b23a6b' : '#eceef2';
+ }
+ ctx.fillRect(x, ly + bob - 1, 3, 3);
+ }
+ }
+ }
+
+ /* the floating — bioluminescent after dark */
+ for (let i=0;i<state.floating;i++) {
+ const f = floaters[i];
+ const p = floaterPos(f, t);
+ const [R,G,B] = f.hue;
+ if (n) {
+ for (const tr of f.trail) { /* glowing wake */
+ const a = (1 - tr.age/3.0) * .30;
+ ctx.fillStyle = `rgba(127,224,178,${a})`;
+ ctx.fillRect(tr.x-1, tr.y, 3, 2);
+ }
+ const g = ctx.createRadialGradient(p.x, p.y, 1, p.x, p.y, 15);
+ g.addColorStop(0, `rgba(${R},${G},${B},.55)`);
+ g.addColorStop(.5, 'rgba(127,224,178,.20)');
+ g.addColorStop(1, 'rgba(127,224,178,0)');
+ ctx.fillStyle = g;
+ ctx.fillRect(p.x-15, p.y-15, 30, 30);
+ } else {
+ ctx.fillStyle = 'rgba(255,255,255,.55)'; /* day wake */
+ ctx.fillRect(p.x-11, p.y+3, 6, 1); ctx.fillRect(p.x+6, p.y+3, 6, 1);
+ }
+ const px = Math.round(p.x), py = Math.round(p.y);
+ ctx.fillStyle = 'rgba(23,19,26,.85)'; /* ink ring so they pop */
+ ctx.fillRect(px-4, py-4, 8, 8);
+ ctx.fillStyle = `rgb(${R},${G},${B})`;
+ ctx.fillRect(px-3, py-3, 6, 6);
+ ctx.fillStyle = 'rgba(255,255,255,.9)';
+ ctx.fillRect(px-3, py-3, 2, 2);
+ }
+
+ /* rain rings on the surface */
+ if (state.rain) {
+ if (Math.random() < .5) rings.push({
+ x: Math.random()*480, y: WATER_Y + 6 + Math.random()*(NEAR_Y-WATER_Y-12), r: 1,
+ });
+ rings = rings.filter(rg => rg.r < 16);
+ for (const rg of rings) {
+ rg.r += 14*dt;
+ ctx.strokeStyle = `rgba(220,235,250,${(1 - rg.r/16)*.35})`;
+ ctx.lineWidth = 1;
+ ctx.beginPath();
+ ctx.ellipse(rg.x, rg.y, rg.r, rg.r*.32, 0, 0, Math.PI*2);
+ ctx.stroke();
+ }
+ } else if (rings.length) rings = [];
+
+ /* ------ near deck ------ */
+ ctx.fillStyle = n ? '#454b58' : '#868f9e'; /* coping */
+ ctx.fillRect(0, NEAR_Y, 480, 8);
+ ctx.fillStyle = n ? '#2e6f96' : '#4fb4e6';
+ ctx.fillRect(0, NEAR_Y, 480, 2);
+ for (let y=NEAR_Y+8; y<600; y+=12) { /* checker tiles */
+ for (let x=0; x<480; x+=12) {
+ const alt = ((x/12 + y/12) % 2) === 0;
+ ctx.fillStyle = n
+ ? (alt ? '#39404e' : '#323846')
+ : (alt ? '#c8cdd6' : '#b9bfca');
+ ctx.fillRect(x, y, 11, 11);
+ }
+ }
+ /* towels waiting for their agents */
+ const towels = [[150,560,26,'#b23a6b'],[230,568,26,'#4fb4e6'],[320,556,26,'#e8a84c']];
+ for (const [tx2,ty2,tw2,tc] of towels) {
+ ctx.fillStyle = tc; ctx.globalAlpha = n ? .6 : 1;
+ ctx.fillRect(tx2, ty2, tw2, 10);
+ ctx.fillStyle = 'rgba(255,255,255,.5)';
+ ctx.fillRect(tx2, ty2+4, tw2, 2);
+ ctx.globalAlpha = 1;
+ }
+ /* pool ladder */
+ ctx.fillStyle = n ? '#8b97a8' : '#d5dbe4';
+ ctx.fillRect(82, 522, 3, 34); ctx.fillRect(96, 522, 3, 34);
+ ctx.fillRect(78, 520, 7, 3); ctx.fillRect(96, 520, 7, 3);
+ for (const ry of [530, 538, 546]) ctx.fillRect(85, ry, 11, 2);
+
+ /* low mist over the water */
+ for (let mi=1; mi<mists.length; mi++) {
+ const m = mists[mi];
+ const mx = Math.sin(t*.13 + m.p) * 40 + Math.cos(t*.07 + m.p*2) * 24;
+ const a = m.a * ((n || state.rain) ? 1.5 : .9);
+ const mg = ctx.createLinearGradient(0, m.y, 0, m.y + m.h);
+ mg.addColorStop(0, 'rgba(200,215,225,0)');
+ mg.addColorStop(.5, `rgba(200,215,225,${a})`);
+ mg.addColorStop(1, 'rgba(200,215,225,0)');
+ ctx.fillStyle = mg;
+ ctx.fillRect(-80 + mx, m.y, 640, m.h);
+ }
+
+ /* ------ the shower ------ */
+ if (state.rain) {
+ ctx.fillStyle = n ? 'rgba(10,14,26,.12)' : 'rgba(30,40,58,.12)';
+ ctx.fillRect(0, 0, 480, 600);
+ const wind = Math.sin(t*.25)*24 - 34;
+ ctx.strokeStyle = 'rgba(185,205,235,.45)';
+ ctx.lineWidth = 1;
+ ctx.beginPath();
+ for (const dr of drops) {
+ dr.y += dr.v * dt; dr.x += wind * dt;
+ if (dr.y > 600) { dr.y = -12; dr.x = Math.random()*560-30; }
+ const k = dr.l / dr.v;
+ ctx.moveTo(dr.x, dr.y);
+ ctx.lineTo(dr.x + wind*k, dr.y + dr.l);
+ }
+ ctx.stroke();
+ }
+
+ requestAnimationFrame(frame);
+}
+requestAnimationFrame(frame);
+
+/* ---------------- controls & public API ---------------- */
+const $ = id => document.getElementById(id);
+function refreshHud() {
+ $('floatN').textContent = state.floating;
+ $('hudDot').classList.toggle('lit', state.floating > 0);
+ $('btnNight').textContent = state.night ? 'Day' : 'Night';
+ $('btnRain').textContent = state.rain ? 'Clear Skies' : 'Shower';
+}
+$('btnFloat').onclick = () => { state.floating = Math.min(MAX_FLOATING, state.floating+1); refreshHud(); };
+$('btnOut').onclick = () => { state.floating = 0; refreshHud(); };
+$('btnNight').onclick = () => { state.night = !state.night; refreshHud(); };
+$('btnRain').onclick = () => { state.rain = !state.rain; refreshHud(); };
+
+/* Public API — wire to /city/lido when the endpoint is live:
+ lido.connect('/city/lido', 15000)
+ expects JSON like {floating: 5} (or {agents}/{idle}/{count}). */
+let pollTimer = null;
+window.lido = {
+ setFloating(nn) { state.floating = Math.max(0, Math.min(MAX_FLOATING, nn|0)); refreshHud(); },
+ getFloating() { return state.floating; },
+ setNight(v) { state.night = !!v; refreshHud(); },
+ setRain(v) { state.rain = !!v; refreshHud(); },
+ connect(url, ms=15000) {
+ const poll = () => fetch(url)
+ .then(r => r.json())
+ .then(d => this.setFloating(d.floating ?? d.agents ?? d.idle ?? d.count ?? 0))
+ .catch(() => {});
+ poll();
+ clearInterval(pollTimer);
+ pollTimer = setInterval(poll, ms);
+ return () => clearInterval(pollTimer);
+ },
+};
+refreshHud();
+</script>
+</body>
+</html>

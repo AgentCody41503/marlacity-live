@@ -1,0 +1,525 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Igdrasil — The Great Tree — Ring Park</title>
+<style>
+ :root {
+ --bark:#5c4638; --leaf:#3a6e4e; --glow:#baf0b2; --amber:#e8a84c;
+ --lamp:#ffd76a; --rose:#b23a6b; --cody:#4fb4e6; --mint:#7fe0b2;
+ --ink:#17131a; --panel:#1c2230; --panel2:#141926;
+ }
+ * { box-sizing:border-box; margin:0; padding:0; }
+ body {
+ background:#0d1017;
+ color:#d8dce6;
+ font-family:'Courier New', ui-monospace, monospace;
+ display:flex; flex-direction:column; align-items:center;
+ min-height:100vh; padding:18px 12px 28px;
+ }
+ h1 {
+ font-size:15px; letter-spacing:4px; color:var(--mint);
+ text-transform:uppercase; margin-bottom:2px; text-align:center;
+ }
+ .sub {
+ font-size:11px; letter-spacing:3px; color:#7d8598;
+ text-transform:uppercase; margin-bottom:14px; text-align:center;
+ }
+ .sub .rose { color:var(--rose); }
+ .frame {
+ background:var(--panel2);
+ border:2px solid #2a3145;
+ box-shadow:0 0 0 2px #0a0d13, 0 12px 40px rgba(0,0,0,.6);
+ padding:10px;
+ image-rendering:pixelated;
+ }
+ canvas#scene {
+ display:block;
+ width:min(480px, calc(100vw - 60px));
+ image-rendering:pixelated;
+ background:#000;
+ }
+ .hud {
+ width:min(504px, calc(100vw - 36px));
+ margin-top:12px;
+ background:var(--panel);
+ border:2px solid #2a3145;
+ padding:12px 14px;
+ display:flex; flex-wrap:wrap; gap:10px; align-items:center; justify-content:center;
+ }
+ button {
+ font-family:inherit; font-size:11px; letter-spacing:2px; text-transform:uppercase;
+ background:#232b3d; color:#d8dce6;
+ border:2px solid #3a4560; padding:8px 12px; cursor:pointer;
+ }
+ button:hover { background:#2c3650; border-color:var(--mint); }
+ button.mint { border-color:var(--mint); color:var(--mint); }
+ .counter {
+ display:flex; align-items:center; gap:8px;
+ font-size:12px; letter-spacing:2px; text-transform:uppercase;
+ }
+ .dot {
+ width:12px; height:12px; background:var(--mint); border:2px solid #0a0d13;
+ box-shadow:0 0 8px 2px rgba(127,224,178,.0); transition:box-shadow .3s;
+ }
+ .dot.lit { box-shadow:0 0 10px 3px rgba(127,224,178,.8); }
+ #agentN { color:var(--mint); font-size:16px; min-width:2ch; text-align:center; }
+ .wire {
+ width:min(504px, calc(100vw - 36px));
+ margin-top:10px; padding:10px 14px;
+ background:var(--panel2); border:2px dashed #2a3145;
+ font-size:11px; line-height:1.7; color:#8a92a6;
+ }
+ .wire code { color:var(--cody); }
+ .wire .k { color:var(--mint); }
+</style>
+</head>
+<body>
+
+<h1>Igdrasil — The Great Tree</h1>
+<div class="sub">Ring Park · <span class="rose">Center of Everything</span></div>
+
+<div class="frame"><canvas id="scene" width="480" height="600"></canvas></div>
+
+<div class="hud">
+ <div class="counter"><div class="dot" id="hudDot"></div> Gathered <span id="agentN">0</span></div>
+ <button id="btnAgent" class="mint">+ Agent</button>
+ <button id="btnDisperse">Disperse</button>
+ <button id="btnNight">Day</button>
+ <button id="btnRunes">Runes: Lit</button>
+</div>
+
+<div class="wire">
+ <span class="k">GATHERING AT THE TREE</span> — the sprite exposes a tiny API for
+ <code>/city/agents</code>: call <code>igdrasil.setAgents(n)</code> directly, or
+ <code>igdrasil.connect('/city/agents', 15000)</code> to poll a JSON endpoint
+ (reads <code>agents</code>, <code>idle</code>, or <code>count</code>). Also:
+ <code>setNight(bool)</code>, <code>setRunes(bool)</code>. Named for Yggdrasil,
+ spelled the way Marla City first heard it — ask the tree and it teaches you the old name.
+</div>
+
+<script>
+/* ============================================================
+ IGDRASIL — THE GREAT TREE — hand-grown 56×64 sprite
+ Palette: Bark #5c4638 · Leaf #3a6e4e · Glow #baf0b2
+ Amber #e8a84c · Lamp #ffd76a · Mint #7fe0b2
+ Legend: E/e/g leaf dark→light L glow leaf (shimmers)
+ T/t/u bark+shade+ridge A rune (pulses amber)
+ K root shadow . transparent
+ ============================================================ */
+const SPRITE = [
+"............................g...........................",
+".....................gggggggLggggggg....................",
+"...................ggEeegggEeeEeEEEEgE..................",
+".................ggLeeeeEeeeeegegEeeEEgE................",
+"..............E.gegggEEEEEEeeeLgeEgeEEEEE...............",
+".........gggggEggggggEEEeEEeeegeLeeLEEEeeE..............",
+".......ggggeEeeegeEEEEEEgegEEeeegEEEEEEggggE............",
+"......gEegegEEEgggEEEEEeggLEEEgegEeEEEEggeeegggE........",
+".....gEEEggLeEEegeEE.EEEgeeEEeLeEEeEEEEggeEEEEEeE.......",
+"....gEEEEeLeEeEEEE.....EgELLeEeegeegeeEEEEeEEgggEgE.....",
+"....eEEEEgeEEEEEE.......EeeeeeEEeEEgggggeeEeEgggEEEE....",
+"....EEEEeeggeEEEeE.....ggeeeeEeEEEeEeegEegeeEeggEEEE....",
+"...EgegeLeEEEEEeeegE.ggeegeegggegggegegEEeEEeLgeEEEE....",
+"....geEEeEEEEEeeeeeEgeeEgLegLeegLgLgeegEEeEEEgegeEEgE...",
+"....egeeeEEeEEEgeeegEEEgeeegeeegegeggeLeeEeEegeeEEegE...",
+"....gEeeeEeEeeegLgEEEggeeeeegLeggeggeLEgggEEEEegELEEE...",
+"...gggEeeEEeLggggeEEEeEgLgeLegggggeLEE.EEgEEEEeLeeegeE..",
+"..ggegggeEEEegLgggEEEeEeeggLLgLggegE.....EEEEeeeeeeeeE..",
+"..EeEgegegggEEELegEeEEeEegeeggEeEEE.......LegeegEggeEeE.",
+".EeEgeEeEggeeeEeeeEEEeEEeEggLgEEEgEE.....ggeggggEgeEeEE.",
+"..ELgeEeEggLEEEeEgeEeEEeEEgeggEeEEgegE.ggeeeggggegeeEEEE",
+"..EegeggegEEEeeEEEEEEeggeeEEeEeeegeeeegeeEeeegLgggegEEE.",
+"...EggLgeE...EeEeEEEeggegeegLeggeEeLeggeegEeeLgeeEeEEgE.",
+"....EggLE.....eEEeEEELgeEeLEgeegEggeeegEeeeELeeeEegeeE..",
+".....EEEgE...gEeegLeeeLeeEEgggEEEgggEeEgeEEegEEeEeeeE...",
+"........eEgggEeegLegegeeeEegegeegggeEEEeeeeEeEEELEEE....",
+"........EeEEgegeeeegegeeEEEggLeeegegEEEggEgLgEEEE.......",
+".........EEELgeLegeegegeTuTTttteEEeegegeeeegLggE........",
+"..........EegggeggegeegeEuuTtTtteeeEggLgggggLeE.........",
+"...........EEgggggegggEEeuuTtTtteLLELgggeEgeEE..........",
+".............EEEEEEEEEEEEuutTTttEEEEEeEEEEEE............",
+"...................E.....uutTTtt.....E..................",
+".........................uutTTtt........................",
+"..........................uTTTTtt.......................",
+"..........................uTTTTtt.......................",
+"..........................uTTTTtt.......................",
+"..........................TuTTttt.......................",
+"..........................TuTTttt.......................",
+"...........................uuTtTtt......................",
+"..........................TuTTtTTtt.....................",
+"..........................TuTTATTtt.....................",
+"..........................TuTTATTtt.....................",
+"..........................uuTATATtt.....................",
+"..........................uuTtTTTtt.....................",
+"..........................uuTtATTtt.....................",
+"..........................uuTtATTtt.....................",
+"..........................uuTtTATtt.....................",
+".........................TuuTAATTttt....................",
+".........................uuutTTTtTtt....................",
+".........................uuutTATtTtt....................",
+".........................uuutTAAtTtt....................",
+"........................TuuTtTTTttt.....................",
+"........................TuuTtTTTttt.....................",
+"........................TuuTtTTTttt.....................",
+".......................TuuTtTTTtTttt....................",
+"......................uTuuTtTTTtTTttt...................",
+".....................uuTuTTtTTTtTTtttt..................",
+"...................TuuuTTTTtTTTtTTtttt..................",
+"................TTuTuuutTTTtTTTtTTTtttt.t...............",
+".............T.TTuuTuuTtTTTtTTTtTTTtttttttttt...........",
+".............uu..uu.uuTTT.T.TT.TTTTTtt.tt.ttt...........",
+"........................................................",
+"........................................................",
+"........................................................",
+];
+const SW = 56, SH = 64;
+
+/* Palette */
+const PAL = {
+ K:[23,19,26],
+ E:[36,70,58], e:[58,110,78], g:[104,158,94], L:[186,240,178],
+ T:[92,70,56], t:[64,48,40], u:[122,95,72],
+ A:[232,168,76],
+};
+
+/* Rune cells pulse amber; canopy breathes; L-cells shimmer */
+const CANOPY_C = { cx:28, cy:16 }; /* sprite-space canopy heart */
+
+/* ---------------- state ---------------- */
+const state = { agents:0, night:true, runes:true, t:0 };
+const MAX_AGENTS = 24;
+
+/* ---------------- scene layout ---------------- */
+const scene = document.getElementById('scene');
+const ctx = scene.getContext('2d');
+const SCALE = 6;
+const SX = (480 - SW*SCALE)/2; // sprite left = 72
+const POOL_Y = 470; // pool waterline
+const BASE_Y = 452; // where the roots grip the earth
+const SY = BASE_Y - 61*SCALE; // sprite top = 86
+const HEART = { x: SX + CANOPY_C.cx*SCALE, y: SY + CANOPY_C.cy*SCALE };
+
+/* offscreen: raw 56x64 sprite pixels */
+const spriteCv = document.createElement('canvas');
+spriteCv.width = SW; spriteCv.height = SH;
+const spriteCtx = spriteCv.getContext('2d');
+const img = spriteCtx.createImageData(SW, SH);
+
+/* offscreen: full world (sky + park + tree) used for the pool reflection */
+const worldCv = document.createElement('canvas');
+worldCv.width = 480; worldCv.height = POOL_Y;
+const wctx = worldCv.getContext('2d');
+
+/* stars, fireflies, drifting mist, pool ripples */
+const stars = Array.from({length:70}, () => ({
+ x: Math.random()*480, y: Math.random()*280,
+ s: Math.random() < .18 ? 2 : 1, p: Math.random()*Math.PI*2,
+}));
+const fireflies = Array.from({length:14}, (_,i) => ({
+ x: Math.random()*480, y: 396 + Math.random()*60,
+ p: Math.random()*Math.PI*2, v: .8 + Math.random()*1.4,
+}));
+const mists = [
+ { y:430, h:26, v:9, a:.05, p:0 },
+ { y:452, h:20, v:-6, a:.07, p:2 },
+ { y:480, h:30, v:5, a:.06, p:4 },
+];
+const ripples = Array.from({length:16}, () => ({
+ x: Math.random()*480, y: POOL_Y + 10 + Math.random()*(600-POOL_Y-20),
+ w: 12 + Math.random()*30, v: .12 + Math.random()*.25,
+}));
+
+/* the gathered — agents floating around the canopy, not idle, just floating */
+const AGENT_HUES = [
+ [79,180,230], /* cody blue */
+ [232,168,76], /* amber */
+ [178,58,107], /* rose */
+ [127,224,178], /* mint */
+ [216,225,255], /* pale signal */
+];
+const orbSeeds = Array.from({length:MAX_AGENTS}, (_,i) => ({
+ ph: i * 2.399963, /* golden-angle spread */
+ sp: .22 + ((i*37)%13)/13 * .30, /* orbit speed */
+ rx: 120 + ((i*53)%17)/17 * 80, /* wide orbits — out past the leaves */
+ ry: 48 + ((i*29)%11)/11 * 46,
+ bob: .8 + ((i*17)%7)/7 * 1.6,
+ hue: AGENT_HUES[i % AGENT_HUES.length],
+}));
+function orbPos(o, t) {
+ const a = t*o.sp + o.ph;
+ return {
+ x: HEART.x + Math.cos(a)*o.rx,
+ y: HEART.y + 14 + Math.sin(a*.8 + o.ph)*o.ry + Math.sin(t*o.bob + o.ph)*4,
+ depth: Math.sin(a), /* <0 = behind the tree */
+ };
+}
+function drawOrb(c, o, t) {
+ const p = orbPos(o, t);
+ const near = p.depth >= 0;
+ const s = near ? 5 : 3;
+ const [R,G,B] = o.hue;
+ const glowA = (state.night ? .50 : .34) * (near ? 1 : .6);
+ const g = c.createRadialGradient(p.x, p.y, 1, p.x, p.y, s*3.2);
+ g.addColorStop(0, `rgba(${R},${G},${B},${glowA})`);
+ g.addColorStop(1, `rgba(${R},${G},${B},0)`);
+ c.fillStyle = g;
+ c.fillRect(p.x - s*3.2, p.y - s*3.2, s*6.4, s*6.4);
+ c.fillStyle = `rgba(${R},${G},${B},${near ? 1 : .65})`;
+ c.fillRect(Math.round(p.x - s/2), Math.round(p.y - s/2), s, s);
+ c.fillStyle = `rgba(255,255,255,${near ? .9 : .4})`;
+ c.fillRect(Math.round(p.x - s/2), Math.round(p.y - s/2), 2, 2);
+}
+
+/* ---------------- sprite raster ---------------- */
+function renderSprite(t) {
+ const d = img.data;
+ d.fill(0);
+ const breathe = Math.sin(t*1.05)*.5 + .5; /* slow, ancient */
+ const crowd = Math.min(state.agents, 12)/12; /* fuller = brighter */
+
+ const put = (x, y, rgb, boost=0) => {
+ if (x<0||x>=SW||y<0||y>=SH) return;
+ const i = (y*SW + x)*4;
+ d[i] = Math.min(255, rgb[0] + boost);
+ d[i+1] = Math.min(255, rgb[1] + boost);
+ d[i+2] = Math.min(255, rgb[2] + boost*0.7);
+ d[i+3] = 255;
+ };
+
+ for (let y=0; y<SH; y++) {
+ for (let x=0; x<SW; x++) {
+ const ch = SPRITE[y][x];
+ if (ch === '.') continue;
+
+ if (ch === 'L') { /* glow leaves shimmer */
+ const ph = (x*7 + y*13) % 6.28;
+ const tw = Math.sin(t*1.05 + ph)*.5 + .5;
+ put(x, y, PAL.L, tw*(30 + crowd*50) - 20);
+ continue;
+ }
+ if (ch === 'A') { /* runes pulse amber */
+ if (state.runes) {
+ const pulse = Math.sin(t*2.1 + y*.7)*.5 + .5;
+ put(x, y, PAL.A, pulse*80);
+ } else {
+ put(x, y, PAL.t);
+ }
+ continue;
+ }
+ let boost = 0;
+ if (ch === 'g') boost = breathe * (4 + crowd*10); /* canopy breathes */
+ put(x, y, PAL[ch], boost);
+ }
+ }
+ spriteCtx.putImageData(img, 0, 0);
+}
+
+/* ---------------- world (sky + park + tree) ---------------- */
+function renderWorld(t) {
+ const n = state.night;
+
+ /* sky */
+ const sky = wctx.createLinearGradient(0, 0, 0, POOL_Y);
+ if (n) { sky.addColorStop(0,'#0a0e1c'); sky.addColorStop(.65,'#141b30'); sky.addColorStop(1,'#1d2438'); }
+ else { sky.addColorStop(0,'#7ec3e8'); sky.addColorStop(.7,'#b8dcef'); sky.addColorStop(1,'#d9ebf4'); }
+ wctx.fillStyle = sky;
+ wctx.fillRect(0, 0, 480, POOL_Y);
+
+ if (n) {
+ for (const st of stars) {
+ const tw = .45 + .55 * Math.abs(Math.sin(t*1.3 + st.p));
+ wctx.fillStyle = `rgba(216,225,255,${tw})`;
+ wctx.fillRect(st.x|0, st.y|0, st.s, st.s);
+ }
+ wctx.fillStyle = '#e8ecf7'; /* moon */
+ wctx.fillRect(396, 46, 22, 22);
+ wctx.fillStyle = '#c6cde3';
+ wctx.fillRect(400, 52, 6, 6); wctx.fillRect(408, 58, 4, 4);
+ wctx.fillStyle = '#0a0e1c';
+ wctx.fillRect(392, 42, 8, 8); /* crescent bite */
+ } else {
+ wctx.fillStyle = '#fff3c2'; /* sun */
+ wctx.fillRect(52, 44, 20, 20);
+ wctx.fillStyle = 'rgba(255,243,194,.35)';
+ wctx.fillRect(46, 50, 32, 8); wctx.fillRect(58, 38, 8, 32);
+ wctx.fillStyle = 'rgba(255,255,255,.75)'; /* humid SC clouds */
+ wctx.fillRect(300, 66, 54, 8); wctx.fillRect(316, 58, 30, 8);
+ wctx.fillRect(120, 104, 44, 8); wctx.fillRect(132, 96, 24, 8);
+ wctx.fillRect(380, 130, 60, 8);
+ }
+
+ /* the city ring — every district faces the park */
+ wctx.fillStyle = n ? '#10162a' : '#9cc3d8';
+ const sk = [[0,44,368],[50,28,352],[84,36,376],[126,24,384],[330,26,382],[362,34,360],[402,26,374],[434,46,356]];
+ for (const [x,w,yTop] of sk) wctx.fillRect(x, yTop, w, 434 - yTop);
+ if (n) { /* distant lit windows */
+ wctx.fillStyle = 'rgba(232,168,76,.55)';
+ for (let i=0;i<12;i++) wctx.fillRect((i*71+19)%460, 362+(i*31)%64, 2, 2);
+ }
+
+ /* park lawn ringing the tree */
+ wctx.fillStyle = n ? '#20301f' : '#4d7a42';
+ wctx.fillRect(0, 434, 480, POOL_Y - 434);
+ wctx.fillStyle = n ? '#182517' : '#3f6636';
+ wctx.fillRect(0, 448, 480, 4);
+ /* wildflowers in the grass */
+ for (let i=0;i<18;i++) {
+ const fx = (i*97+31)%470, fy = 438 + (i*53)%26;
+ wctx.fillStyle = ['#b23a6b','#e8a84c','#d8dce6'][i%3] + '';
+ wctx.globalAlpha = n ? .35 : .8;
+ wctx.fillRect(fx, fy, 2, 2);
+ wctx.globalAlpha = 1;
+ }
+ /* stone pool rim */
+ wctx.fillStyle = n ? '#454b58' : '#868f9e';
+ wctx.fillRect(0, POOL_Y-6, 480, 6);
+ wctx.fillStyle = n ? '#30353f' : '#6a7280';
+ wctx.fillRect(0, POOL_Y-2, 480, 2);
+
+ /* agents drifting behind the canopy */
+ if (state.agents > 0) {
+ for (let i=0;i<state.agents;i++) {
+ const o = orbSeeds[i];
+ if (orbPos(o, t).depth < 0) drawOrb(wctx, o, t);
+ }
+ }
+
+ /* Igdrasil itself */
+ wctx.imageSmoothingEnabled = false;
+ wctx.drawImage(spriteCv, SX, SY, SW*SCALE, SH*SCALE);
+
+ /* agents drifting before the canopy */
+ if (state.agents > 0) {
+ for (let i=0;i<state.agents;i++) {
+ const o = orbSeeds[i];
+ if (orbPos(o, t).depth >= 0) drawOrb(wctx, o, t);
+ }
+ }
+
+ /* the canopy's faint ancient glow, fuller as agents gather */
+ const breathe = Math.sin(t*1.05)*.5 + .5;
+ const crowd = Math.min(state.agents, 12)/12;
+ const base = (n ? .10 : .045) + crowd*.10;
+ const rad = 150 + breathe*24 + crowd*30;
+ const gl = wctx.createRadialGradient(HEART.x, HEART.y, 10, HEART.x, HEART.y, rad);
+ gl.addColorStop(0, `rgba(186,240,178,${base + breathe*.05})`);
+ gl.addColorStop(1, 'rgba(186,240,178,0)');
+ wctx.fillStyle = gl;
+ wctx.fillRect(HEART.x-rad, HEART.y-rad, rad*2, rad*2);
+
+ /* Columbia weather: low mist off the pools, thicker at night */
+ for (const m of mists) {
+ if (m.y >= POOL_Y) continue;
+ const mx = Math.sin(t*.13 + m.p) * 40 + Math.cos(t*.07 + m.p*2) * 24;
+ const a = m.a * (n ? 1.4 : .9);
+ const mg = wctx.createLinearGradient(0, m.y, 0, m.y + m.h);
+ mg.addColorStop(0, 'rgba(200,215,225,0)');
+ mg.addColorStop(.5, `rgba(200,215,225,${a})`);
+ mg.addColorStop(1, 'rgba(200,215,225,0)');
+ wctx.fillStyle = mg;
+ wctx.fillRect(-80 + mx, m.y, 640, m.h);
+ }
+
+ /* fireflies rise at night */
+ if (n) {
+ for (const f of fireflies) {
+ f.x += Math.sin(t*.6 + f.p) * .3;
+ const fy = f.y + Math.sin(t*f.v + f.p) * 6;
+ const a = Math.max(0, Math.sin(t*1.7 + f.p*3));
+ wctx.fillStyle = `rgba(255,215,106,${a*.85})`;
+ wctx.fillRect(f.x|0, fy|0, 2, 2);
+ }
+ }
+}
+
+/* ---------------- main frame ---------------- */
+function frame(ms) {
+ const t = ms/1000; state.t = t;
+ renderSprite(t);
+ renderWorld(t);
+
+ ctx.imageSmoothingEnabled = false;
+ ctx.clearRect(0, 0, 480, 600);
+ ctx.drawImage(worldCv, 0, 0);
+
+ /* ------ the pools ------ */
+ const n = state.night;
+ const wat = ctx.createLinearGradient(0, POOL_Y, 0, 600);
+ if (n) { wat.addColorStop(0,'#101b2e'); wat.addColorStop(1,'#0a1220'); }
+ else { wat.addColorStop(0,'#5aa7cc'); wat.addColorStop(1,'#3f88ad'); }
+ ctx.fillStyle = wat;
+ ctx.fillRect(0, POOL_Y, 480, 600-POOL_Y);
+
+ /* reflection: flipped world, sliced with a slow sway */
+ ctx.save();
+ ctx.globalAlpha = n ? .32 : .22;
+ const RH = 600 - POOL_Y;
+ const SRC = Math.min(RH*1.6, POOL_Y);
+ for (let band=0; band<RH; band+=3) {
+ const off = Math.round(Math.sin(t*1.6 + band*.16) * (1 + band*.05));
+ const sy = POOL_Y - (band/RH)*SRC - SRC/RH*3;
+ ctx.drawImage(worldCv, 0, sy, 480, SRC/RH*3, off, POOL_Y+band, 480, 3);
+ }
+ ctx.restore();
+
+ /* the canopy's long soft reflection */
+ const breathe = Math.sin(t*1.05)*.5 + .5;
+ const crowd = Math.min(state.agents, 12)/12;
+ const streakA = (n ? .10 : .05) + breathe*.05 + crowd*.10;
+ ctx.fillStyle = `rgba(186,240,178,${streakA})`;
+ for (let y=POOL_Y+4; y<600; y+=4) {
+ const sway = Math.sin(t*2 + y*.12) * (2 + (y-POOL_Y)*.06);
+ const w = 26 + (y-POOL_Y)*.28;
+ ctx.fillRect(HEART.x - w/2 + sway, y, w, 2);
+ }
+
+ /* ripple glints */
+ ctx.fillStyle = n ? 'rgba(140,170,220,.20)' : 'rgba(255,255,255,.35)';
+ for (const r of ripples) {
+ r.x = (r.x + r.v) % (480 + r.w);
+ ctx.fillRect(r.x - r.w, r.y, r.w, 1);
+ }
+
+ requestAnimationFrame(frame);
+}
+requestAnimationFrame(frame);
+
+/* ---------------- controls & public API ---------------- */
+const $ = id => document.getElementById(id);
+function refreshHud() {
+ $('agentN').textContent = state.agents;
+ $('hudDot').classList.toggle('lit', state.agents > 0);
+ $('btnNight').textContent = state.night ? 'Day' : 'Night';
+ $('btnRunes').textContent = state.runes ? 'Runes: Lit' : 'Runes: Dark';
+}
+$('btnAgent').onclick = () => { state.agents = Math.min(MAX_AGENTS, state.agents+1); refreshHud(); };
+$('btnDisperse').onclick = () => { state.agents = 0; refreshHud(); };
+$('btnNight').onclick = () => { state.night = !state.night; refreshHud(); };
+$('btnRunes').onclick = () => { state.runes = !state.runes; refreshHud(); };
+
+/* Public API — wire to /city/agents when the endpoint is live:
+ igdrasil.connect('/city/agents', 15000)
+ expects JSON like {agents: 7} (or {idle: 7} / {count: 7}). */
+let pollTimer = null;
+window.igdrasil = {
+ setAgents(nn) { state.agents = Math.max(0, Math.min(MAX_AGENTS, nn|0)); refreshHud(); },
+ getAgents() { return state.agents; },
+ setNight(v) { state.night = !!v; refreshHud(); },
+ setRunes(v) { state.runes = !!v; refreshHud(); },
+ connect(url, ms=15000) {
+ const poll = () => fetch(url)
+ .then(r => r.json())
+ .then(d => this.setAgents(d.agents ?? d.idle ?? d.count ?? 0))
+ .catch(() => {});
+ poll();
+ clearInterval(pollTimer);
+ pollTimer = setInterval(poll, ms);
+ return () => clearInterval(pollTimer);
+ },
+};
+refreshHud();
+</script>
+</body>
+</html>

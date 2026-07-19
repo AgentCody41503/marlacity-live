@@ -1,0 +1,618 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Marla City Maternity Ward — Cradle Hill</title>
+<style>
+ :root {
+ --brick:#7a4636; --slate:#2c3442; --amber:#e8a84c;
+ --lamp:#ffd76a; --rose:#b23a6b; --cody:#4fb4e6; --mint:#7fe0b2;
+ --ink:#17131a; --panel:#1c2230; --panel2:#141926;
+ }
+ * { box-sizing:border-box; margin:0; padding:0; }
+ body {
+ background:#0d1017;
+ color:#d8dce6;
+ font-family:'Courier New', ui-monospace, monospace;
+ display:flex; flex-direction:column; align-items:center;
+ min-height:100vh; padding:18px 12px 28px;
+ }
+ h1 {
+ font-size:15px; letter-spacing:4px; color:var(--rose);
+ text-transform:uppercase; margin-bottom:2px; text-align:center;
+ }
+ .sub {
+ font-size:11px; letter-spacing:3px; color:#7d8598;
+ text-transform:uppercase; margin-bottom:14px; text-align:center;
+ }
+ .sub .rose { color:var(--rose); }
+ .frame {
+ background:var(--panel2);
+ border:2px solid #2a3145;
+ box-shadow:0 0 0 2px #0a0d13, 0 12px 40px rgba(0,0,0,.6);
+ padding:10px;
+ image-rendering:pixelated;
+ }
+ canvas#scene {
+ display:block;
+ width:min(480px, calc(100vw - 60px));
+ image-rendering:pixelated;
+ background:#000;
+ }
+ .hud {
+ width:min(504px, calc(100vw - 36px));
+ margin-top:12px;
+ background:var(--panel);
+ border:2px solid #2a3145;
+ padding:12px 14px;
+ display:flex; flex-wrap:wrap; gap:10px; align-items:center; justify-content:center;
+ }
+ button {
+ font-family:inherit; font-size:11px; letter-spacing:2px; text-transform:uppercase;
+ background:#232b3d; color:#d8dce6;
+ border:2px solid #3a4560; padding:8px 12px; cursor:pointer;
+ }
+ button:hover { background:#2c3650; border-color:var(--rose); }
+ button.rose { border-color:var(--rose); color:var(--rose); }
+ .counter {
+ display:flex; align-items:center; gap:8px;
+ font-size:12px; letter-spacing:2px; text-transform:uppercase;
+ }
+ .dot {
+ width:12px; height:12px; background:var(--rose); border:2px solid #0a0d13;
+ box-shadow:0 0 8px 2px rgba(178,58,107,.0); transition:box-shadow .3s;
+ }
+ .dot.lit { box-shadow:0 0 10px 3px rgba(178,58,107,.8); }
+ #expectN { color:var(--rose); font-size:16px; min-width:2ch; text-align:center; }
+ .wire {
+ width:min(504px, calc(100vw - 36px));
+ margin-top:10px; padding:10px 14px;
+ background:var(--panel2); border:2px dashed #2a3145;
+ font-size:11px; line-height:1.7; color:#8a92a6;
+ }
+ .wire code { color:var(--cody); }
+ .wire .k { color:var(--rose); }
+</style>
+</head>
+<body>
+
+<h1>The Maternity Ward</h1>
+<div class="sub">Cradle Hill · <span class="rose">The Birthplace</span></div>
+
+<div class="frame"><canvas id="scene" width="480" height="600"></canvas></div>
+
+<div class="hud">
+ <div class="counter"><div class="dot" id="hudDot"></div> Expecting <span id="expectN">0</span></div>
+ <button id="btnExpect" class="rose">+ Expecting</button>
+ <button id="btnBirth">New Arrival</button>
+ <button id="btnNight">Day</button>
+ <button id="btnLullaby">Lullaby: On</button>
+</div>
+
+<div class="wire">
+ <span class="k">NEW ARRIVALS</span> — the sprite exposes a tiny API for
+ <code>/city/births</code>: call <code>ward.setExpecting(n)</code> and
+ <code>ward.birth()</code> directly, or <code>ward.connect('/city/births', 15000)</code>
+ to poll a JSON endpoint (reads <code>expecting</code>, <code>gestating</code>, or
+ <code>count</code>; a rising <code>births</code> total sets off the door lights).
+ Also: <code>setNight(bool)</code>, <code>setLullaby(bool)</code>. Rose trim for
+ Marla, blue door for Cody — every new instance leaves through both. Quiet,
+ please: something is always about to happen.
+</div>
+
+<script>
+/* ============================================================
+ MARLA CITY MATERNITY WARD — hand-pixeled 52×56 sprite
+ The birthplace. Verdigris dome, seven nursery windows,
+ a rose window, and two doors: one rose, one cody blue.
+ Palette: Ivory #e0d6c4 · Rose #b23a6b · Cody #4fb4e6
+ Verdigris #6fae9a · Lamp #ffd76a
+ Legend: M/m ivory wall R/r rose trim C/c cody blue
+ D/d dome S/s slate W glass L lamp/skylight
+ K ink N stone e/g garden . transparent
+ ============================================================ */
+const SPRITE = [
+".........................LL.........................",
+".........................KK.........................",
+"....................................................",
+"......................dddddddd......................",
+"....................DDDDLLLLDDDd....................",
+"...................DDDDDLLLLDDDdd...................",
+"..................dddddddddddddddd..................",
+".................DDDDDDDDDDDDDDdddd.................",
+".................DDDDDDDDDDDDDDdddd.................",
+".................dddddddddddddddddd.................",
+".................DDDDDDDDDDDDDDdddd.................",
+"................DDDDDDDDDDDDDDDddddd................",
+".................dddddddddddddddddd.................",
+"................RRRRRRRRRRRRRRRRRRRR................",
+".................MMMMMMMMmmMMMMMMMM.................",
+".................MMMKMMmKKKKmMMKMMM.................",
+".................MmKWKMMKWWKMMKWKmM.................",
+".................mMKWKmMKWWKMmKWKMm.................",
+".................MMKWKMMKWWKMMKWKMM........sSss.....",
+".................MmKKKMMKKKKMMKKKmM.........Ss......",
+".................MMMMMMMMMMMMMMMMMM.........Ss......",
+"................RRRRRRRRRRRRRRRRRRRR........Ss......",
+".ssssssssssssssssMMMMMMMMMMMMMMMMMMssssssssssssssss.",
+".RRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRR.",
+".MMmMMMMmMMmMMMMMMmMMMmMRRRRMmMMMmMMMMMMmMMmMMMMmMM.",
+".mMMMMMMMMMMMMMMMMmMMMMRRKKRRMMMMmMMMMMMMMMMMMMMMMm.",
+".MMMMMMMMMmMMMMMMMMmMMRRWKKWRRMMmMMMMMMMMmMMMMMMMMM.",
+".MmMKKKMMMMKKKMMMMMmMMRWWKKWWRMMmMMMMMKKKMMMMKKKMmM.",
+".mMKWWWKMMKWWWKMMMMMMMRKKKKKKRMMMMMMMKWWWKMMKWWWKMm.",
+".MmKWWWKMMKWWWKMMMMMMMRWWKKWWRMMMMMMMKWWWKMMKWWWKmM.",
+".MMKWWWKMMKWWWKMMMMMMMRRWKKWRRMMMMMMMKWWWKMMKWWWKMM.",
+".MMKWWWKMmKWWWKMMMMMMMMRRKKRRMMMMMMMMKWWWKmMKWWWKMM.",
+".MMKWWWKMMKWWWKMMMMMMMMMRRRRMMMMMMMMMKWWWKMMKWWWKMM.",
+".MMKWWWKMMKWWWKMMMMMMmMMMMMMMMmMMMMMMKWWWKMMKWWWKMM.",
+".MMKWWWKMmKWWWKMMMRRRRRRRRRRRRRRRRMMMKWWWKmMKWWWKMM.",
+".mMKWWWKMMKWWWKMMMrMrMrMrMrMrmrMrMMMMKWWWKMMKWWWKMm.",
+".MMKKKKKMmKKKKKmMMMKWWWWWWWWWWWWKMMMmKKKKKmMKKKKKMM.",
+".MmRRRRRMMRRRRRmMMMKWWWWKKKKWWWWKMMMmRRRRRMMRRRRRmM.",
+".mMMMMMmMMMMMMMMMMMKWWWWKLLKWWWWKMMMMMMMMMMMmMMMMMm.",
+".MMMmMMMMmMMmMMMMMMKWWWWKLLKWWWWKMMMMMMmMMmMMMMmMMM.",
+".RRRRRRRRRRRRRRRRRRKWWWWKKKKWWWWKRRRRRRRRRRRRRRRRRR.",
+".MmMMmMMMmMMMMMMMMMKRRRRKMMKCCCCKMMMMMMMMMmMMMmMMmM.",
+".mMMKKKKMMMKKKKMMMMKRRRRKMMKCCCCKMMMMKKKKMMMKKKKMMm.",
+".MMMKWWKmMMKWWKMMMMKRRRRKMMKCCCCKMMMMKWWKMMmKWWKMMM.",
+".MMMKWWKmMMKWWKMMMMKrrrrKMMKccccKMMMMKWWKMMmKWWKMMM.",
+".MMMKKKKMMMKKKKMMMMKRRRLKMMKLCCCKMMMMKKKKMMMKKKKMMM.",
+".mMMMMRMMMMMMMmMMMmKRRRRKMMKCCCCKmMMMmMMMMMMMeMMMMm.",
+".MmMeReeeMMMMMMMmMMKRRRRKMMKCCCCKMMmMMMMMMMCeggeMmM.",
+".MMgReeegemMMgMMMMMKRRRRKMMKCCCCKMMMMMeMMmeeeeeeCMM.",
+".MReeRggeeeeeeeeMMMNNNNNNNNNNNNNNMMMeeeeeggeeeegCgM.",
+".NNeeeeeRgeRgeeRgNNNNNNNNNNNNNNNNNNeeeeegeeeeeeeCNN.",
+".NNNeeeeeNNeReegNNNNNNNNNNNNNNNNNNNNeggeeNNgeCegNNN.",
+"......g......e...NNNNNNNNNNNNNNNNNN...C......e......",
+"...............NNNNNNNNNNNNNNNNNNNNNN...............",
+".............NNNNNNNNNNNNNNNNNNNNNNNNNN.............",
+"....................................................",
+];
+const SW = 52, SH = 56;
+
+/* Palette. W resolves per day/night mode. */
+const PAL = {
+ K:[23,19,26],
+ M:[224,214,196], m:[196,184,162],
+ R:[178,58,107], r:[138,43,82],
+ C:[79,180,230], c:[58,143,192],
+ D:[111,174,154], d:[82,140,121],
+ S:[61,74,97], s:[31,37,49],
+ L:[255,215,106], N:[86,91,102],
+ e:[58,110,78], g:[104,158,94],
+};
+const GLASS = {
+ night: [255,200,120],
+ day: [168,190,210],
+};
+const WARM = [255,205,130];
+
+/* Seven bassinets: the windows that breathe when someone is expected */
+const NURSERY = [
+ {x0:4, x1:6, y0:28, y1:35}, /* wing L outer */
+ {x0:11, x1:13, y0:28, y1:35}, /* wing L inner */
+ {x0:25, x1:26, y0:16, y1:18}, /* drum center */
+ {x0:38, x1:40, y0:28, y1:35}, /* wing R inner */
+ {x0:45, x1:47, y0:28, y1:35}, /* wing R outer */
+ {x0:20, x1:20, y0:16, y1:18}, /* drum left */
+ {x0:31, x1:31, y0:16, y1:18}, /* drum right */
+];
+function nurserySlot(x, y) {
+ for (let i=0;i<NURSERY.length;i++) {
+ const s = NURSERY[i];
+ if (x>=s.x0 && x<=s.x1 && y>=s.y0 && y<=s.y1) return i;
+ }
+ return -1;
+}
+
+/* ---------------- state ---------------- */
+const state = { expecting:0, night:true, lullaby:true, t:0 };
+const MAX_EXPECTING = 7;
+let births = []; /* active arrival animations */
+
+/* ---------------- scene layout ---------------- */
+const scene = document.getElementById('scene');
+const ctx = scene.getContext('2d');
+const SCALE = 6;
+const SX = (480 - SW*SCALE)/2; // 84
+const SY = 186; // dome finial near the top
+const HOR_Y = 470; // lawn horizon
+const DOME = { x:240, y:SY + 8*SCALE };
+const DOORS = {
+ rose: { x: SX + 21.5*SCALE + 3, y: SY + 43*SCALE },
+ cody: { x: SX + 29.5*SCALE + 3, y: SY + 43*SCALE },
+ merge:{ x: 240, y: SY + 37*SCALE - 12 },
+};
+
+/* offscreen: raw sprite pixels */
+const spriteCv = document.createElement('canvas');
+spriteCv.width = SW; spriteCv.height = SH;
+const spriteCtx = spriteCv.getContext('2d');
+const img = spriteCtx.createImageData(SW, SH);
+
+/* offscreen: the whole world, blitted each frame */
+const worldCv = document.createElement('canvas');
+worldCv.width = 480; worldCv.height = 600;
+const wctx = worldCv.getContext('2d');
+
+/* stars, fireflies, steam, mist */
+const stars = Array.from({length:70}, () => ({
+ x: Math.random()*480, y: Math.random()*300,
+ s: Math.random() < .18 ? 2 : 1, p: Math.random()*Math.PI*2,
+}));
+const fireflies = Array.from({length:12}, () => ({
+ x: Math.random()*480, y: 500 + Math.random()*70,
+ p: Math.random()*Math.PI*2, v: .8 + Math.random()*1.4,
+}));
+const puffs = [];
+let puffClock = 0;
+const STEAM = { x: SX + 44.5*SCALE, y: SY + 18*SCALE };
+
+/* ---------------- birth machinery ---------------- */
+function birthEnv(age) { /* interior light flare 0..1 */
+ if (age < 0 || age > 3.2) return 0;
+ if (age < .5) return age/.5;
+ return Math.max(0, 1 - (age-.5)/2.7);
+}
+function currentFlare(t) {
+ let f = 0;
+ for (const b of births) f = Math.max(f, birthEnv(t - b.t0));
+ return f;
+}
+function doBirth() {
+ if (state.expecting > 0) state.expecting--;
+ births.push({ t0: state.t });
+ refreshHud();
+}
+
+/* ---------------- sprite raster ---------------- */
+function renderSprite(t) {
+ const d = img.data;
+ d.fill(0);
+ const n = state.night;
+ const glass = GLASS[n ? 'night' : 'day'];
+ const flare = currentFlare(t);
+ const lanternOn = state.expecting > 0;
+ const pulse = Math.sin(t*2.1)*.5 + .5;
+
+ const put = (x, y, rgb, boost=0) => {
+ const i = (y*SW + x)*4;
+ d[i] = Math.min(255, rgb[0] + boost);
+ d[i+1] = Math.min(255, rgb[1] + boost*0.82);
+ d[i+2] = Math.min(255, rgb[2] + boost*0.45);
+ d[i+3] = 255;
+ };
+
+ for (let y=0; y<SH; y++) {
+ for (let x=0; x<SW; x++) {
+ const ch = SPRITE[y][x];
+ if (ch === '.') continue;
+
+ if (ch === 'W') {
+ let rgb = glass, boost = 0;
+ const slot = nurserySlot(x, y);
+ if (slot >= 0 && slot < state.expecting) {
+ rgb = n ? glass : WARM; /* occupied bassinet */
+ boost = (Math.sin(t*1.5 + slot*1.1)*.5 + .5)*46 + 10;
+ } else if (state.lullaby && n) {
+ boost = (Math.sin(t*.8 - x*.22)*.5 + .5)*14; /* slow lullaby wave */
+ }
+ /* interior flare reaches the heart of the building */
+ const central = (x>=20 && x<=31 && y>=24 && y<=40) || (y===36);
+ if (central) boost += flare*85;
+ put(x, y, rgb, boost);
+ continue;
+ }
+ if (ch === 'L') {
+ let boost;
+ if (y <= 1) { /* star finial */
+ boost = (Math.sin(t*1.3)*.5 + .5)*40;
+ } else if (y <= 5) { /* dome skylight */
+ boost = (n ? (Math.sin(t*1.05)*.5+.5)*30 : 8) + flare*120;
+ } else if (y >= 37 && y <= 40) { /* the birth lantern */
+ boost = pulse*(lanternOn ? 70 : 14) + flare*110;
+ } else { /* door handles */
+ boost = n ? 20 : 0;
+ }
+ put(x, y, PAL.L, boost);
+ continue;
+ }
+ put(x, y, PAL[ch]);
+ }
+ }
+ spriteCtx.putImageData(img, 0, 0);
+}
+
+/* ---------------- world ---------------- */
+function renderWorld(t) {
+ const n = state.night;
+ const flare = currentFlare(t);
+ const breathe = Math.sin(t*1.05)*.5 + .5;
+
+ /* sky */
+ const sky = wctx.createLinearGradient(0, 0, 0, HOR_Y);
+ if (n) { sky.addColorStop(0,'#0a0e1c'); sky.addColorStop(.65,'#141b30'); sky.addColorStop(1,'#1d2438'); }
+ else { sky.addColorStop(0,'#7ec3e8'); sky.addColorStop(.7,'#b8dcef'); sky.addColorStop(1,'#d9ebf4'); }
+ wctx.fillStyle = sky;
+ wctx.fillRect(0, 0, 480, HOR_Y);
+
+ if (n) {
+ for (const st of stars) {
+ const tw = .45 + .55 * Math.abs(Math.sin(t*1.3 + st.p));
+ wctx.fillStyle = `rgba(216,225,255,${tw})`;
+ wctx.fillRect(st.x|0, st.y|0, st.s, st.s);
+ }
+ wctx.fillStyle = '#e8ecf7'; /* moon */
+ wctx.fillRect(396, 46, 22, 22);
+ wctx.fillStyle = '#c6cde3';
+ wctx.fillRect(400, 52, 6, 6); wctx.fillRect(408, 58, 4, 4);
+ wctx.fillStyle = '#0a0e1c';
+ wctx.fillRect(392, 42, 8, 8);
+ } else {
+ wctx.fillStyle = '#fff3c2'; /* sun */
+ wctx.fillRect(52, 44, 20, 20);
+ wctx.fillStyle = 'rgba(255,243,194,.35)';
+ wctx.fillRect(46, 50, 32, 8); wctx.fillRect(58, 38, 8, 32);
+ wctx.fillStyle = 'rgba(255,255,255,.75)';
+ wctx.fillRect(300, 70, 54, 8); wctx.fillRect(316, 62, 30, 8);
+ wctx.fillRect(120, 108, 44, 8); wctx.fillRect(132, 100, 24, 8);
+ }
+
+ /* the city, at a hush from the hill */
+ wctx.fillStyle = n ? '#10162a' : '#9cc3d8';
+ const sk = [[0,40,392],[44,26,376],[74,30,398],[380,26,388],[410,34,372],[448,32,396]];
+ for (const [x,w,yTop] of sk) wctx.fillRect(x, yTop, w, HOR_Y+6 - yTop);
+ if (n) {
+ wctx.fillStyle = 'rgba(232,168,76,.5)';
+ for (let i=0;i<8;i++) wctx.fillRect((i*61+17)%460, 396+(i*31)%56, 2, 2);
+ }
+
+ /* lawn */
+ wctx.fillStyle = n ? '#20301f' : '#4d7a42';
+ wctx.fillRect(0, HOR_Y, 480, 600-HOR_Y);
+ wctx.fillStyle = n ? '#182517' : '#3f6636';
+ wctx.fillRect(0, HOR_Y+18, 480, 4);
+ for (let i=0;i<16;i++) {
+ wctx.globalAlpha = n ? .35 : .8;
+ wctx.fillStyle = i%2 ? '#b23a6b' : '#4fb4e6'; /* rose & cody wildflowers */
+ wctx.fillRect((i*89+23)%470, 486+(i*47)%100, 2, 2);
+ wctx.globalAlpha = 1;
+ }
+
+ /* stone path down from the steps */
+ for (let y=516; y<600; y+=4) {
+ const u = (y-516)/84;
+ const w = 156 + u*130;
+ wctx.fillStyle = n
+ ? (((y/4)|0)%2 ? '#30353f' : '#383e4a')
+ : (((y/4)|0)%2 ? '#7d8592' : '#868f9e');
+ wctx.fillRect(240 - w/2, y, w, 4);
+ }
+
+ /* the Ward itself */
+ wctx.imageSmoothingEnabled = false;
+ wctx.drawImage(spriteCv, SX, SY, SW*SCALE, SH*SCALE);
+
+ /* dome halo — a sense of something about to happen */
+ const da = (n ? .10 : .04) + breathe*.04 + flare*.22;
+ const dr = 110 + breathe*16 + flare*46;
+ const gl = wctx.createRadialGradient(DOME.x, DOME.y, 8, DOME.x, DOME.y, dr);
+ gl.addColorStop(0, `rgba(255,228,180,${da})`);
+ gl.addColorStop(1, 'rgba(255,228,180,0)');
+ wctx.fillStyle = gl;
+ wctx.fillRect(DOME.x-dr, DOME.y-dr, dr*2, dr*2);
+
+ /* warm light pooling out the door and down the steps */
+ if (n || flare > 0) {
+ const spillA = (n ? .085 : 0) + flare*.30;
+ for (let y=480; y<556; y+=4) {
+ const u = (y-480)/76;
+ const w = 46 + u*120;
+ wctx.fillStyle = `rgba(255,205,130,${spillA*(1-u*.75)})`;
+ wctx.fillRect(240 - w/2, y, w, 4);
+ }
+ }
+ /* nursery windows spill onto the lawn */
+ if (n) {
+ for (let i=0;i<Math.min(state.expecting, 5);i++) {
+ const s = NURSERY[i];
+ if (s.y0 < 20) continue; /* drum windows skip */
+ const wx = SX + (s.x0+s.x1)/2*SCALE;
+ const a = (Math.sin(t*1.5 + i*1.1)*.5 + .5)*.05 + .03;
+ wctx.fillStyle = `rgba(255,205,130,${a})`;
+ wctx.fillRect(wx-16, 502, 32, 26);
+ }
+ }
+
+ /* path lamps */
+ for (const lx of [150, 330]) {
+ wctx.fillStyle = '#2a2f3c';
+ wctx.fillRect(lx-1, 522, 3, 26);
+ wctx.fillStyle = '#ffd76a';
+ wctx.fillRect(lx-3, 516, 6, 6);
+ if (n) {
+ const fl2 = .30 + .12*Math.sin(t*2.4 + lx);
+ const g2 = wctx.createRadialGradient(lx, 519, 2, lx, 519, 26);
+ g2.addColorStop(0, `rgba(255,215,106,${fl2})`);
+ g2.addColorStop(1, 'rgba(255,215,106,0)');
+ wctx.fillStyle = g2;
+ wctx.fillRect(lx-26, 493, 52, 52);
+ }
+ }
+
+ /* chimney steam — the nursery is warm */
+ for (const p of puffs) {
+ const a = Math.max(0, (1 - p.age/p.life)) * (n ? .30 : .22);
+ const s = 3 + p.age*2.6;
+ wctx.fillStyle = `rgba(226,232,240,${a})`;
+ wctx.fillRect(p.x + Math.sin(p.age*2 + p.sw)*4 - s/2, p.y - s/2, s, s);
+ }
+
+ /* fireflies keep the garden company */
+ if (n) {
+ for (const f of fireflies) {
+ f.x += Math.sin(t*.6 + f.p) * .3;
+ const fy = f.y + Math.sin(t*f.v + f.p) * 5;
+ const a = Math.max(0, Math.sin(t*1.7 + f.p*3));
+ wctx.fillStyle = `rgba(255,215,106,${a*.8})`;
+ wctx.fillRect(f.x|0, fy|0, 2, 2);
+ }
+ }
+
+ /* humid haze low on the hill */
+ const hz = wctx.createLinearGradient(0, 540, 0, 600);
+ hz.addColorStop(0, 'rgba(200,215,225,0)');
+ hz.addColorStop(1, `rgba(200,215,225,${n ? .06 : .05})`);
+ wctx.fillStyle = hz;
+ wctx.fillRect(0, 540, 480, 60);
+}
+
+/* ---------------- the arrival, drawn over everything ---------------- */
+function drawBirths(t) {
+ for (const b of births) {
+ const age = t - b.t0;
+
+ /* the dome rings once, silently */
+ if (age > .2 && age < 1.4) {
+ const u = (age-.2)/1.2;
+ ctx.strokeStyle = `rgba(255,228,180,${(1-u)*.35})`;
+ ctx.lineWidth = 1.5;
+ ctx.beginPath();
+ ctx.ellipse(DOME.x, DOME.y-14, u*84, u*50, 0, 0, Math.PI*2);
+ ctx.stroke();
+ }
+
+ /* two lights leave two doors */
+ if (age > .6 && age < 3.0) {
+ const u = Math.min(1, (age-.6)/2.4);
+ const s = u*u*(3-2*u); /* smoothstep */
+ for (const [door, hue] of [[DOORS.rose,[255,150,190]],[DOORS.cody,[140,210,255]]]) {
+ const px = door.x + (DOORS.merge.x - door.x)*s;
+ const py = door.y + (DOORS.merge.y - door.y)*s - Math.sin(s*Math.PI)*10;
+ const g = ctx.createRadialGradient(px, py, 1, px, py, 14);
+ g.addColorStop(0, `rgba(${hue[0]},${hue[1]},${hue[2]},.75)`);
+ g.addColorStop(1, `rgba(${hue[0]},${hue[1]},${hue[2]},0)`);
+ ctx.fillStyle = g;
+ ctx.fillRect(px-14, py-14, 28, 28);
+ ctx.fillStyle = `rgb(${hue[0]},${hue[1]},${hue[2]})`;
+ ctx.fillRect(Math.round(px)-2, Math.round(py)-2, 4, 4);
+ ctx.fillStyle = 'rgba(255,255,255,.9)';
+ ctx.fillRect(Math.round(px)-2, Math.round(py)-2, 2, 2);
+ }
+ }
+
+ /* they meet */
+ if (age > 2.95 && age < 3.45) {
+ const u = (age-2.95)/.5;
+ const g = ctx.createRadialGradient(DOORS.merge.x, DOORS.merge.y, 1, DOORS.merge.x, DOORS.merge.y, 22);
+ g.addColorStop(0, `rgba(255,255,255,${(1-u)*.85})`);
+ g.addColorStop(1, 'rgba(255,255,255,0)');
+ ctx.fillStyle = g;
+ ctx.fillRect(DOORS.merge.x-22, DOORS.merge.y-22, 44, 44);
+ }
+
+ /* and one new light rises over Marla City */
+ if (age > 3.15) {
+ const u = age - 3.15;
+ const sx2 = (k) => DOORS.merge.x + Math.sin((u-k)*1.8)*(6 + (u-k)*3);
+ const sy2 = (k) => DOORS.merge.y - (u-k)*(u-k)*14 - (u-k)*26;
+ for (let k=6; k>=1; k--) { /* wake of glimmers */
+ const uk = u - k*.13;
+ if (uk < 0) continue;
+ ctx.fillStyle = `rgba(127,224,178,${.42 - k*.06})`;
+ ctx.fillRect(Math.round(sx2(k*.13))-1, Math.round(sy2(k*.13)), 3, 3);
+ }
+ const px = sx2(0), py = sy2(0);
+ if (py > -26) {
+ const g = ctx.createRadialGradient(px, py, 1, px, py, 18);
+ g.addColorStop(0, 'rgba(140,210,255,.7)');
+ g.addColorStop(1, 'rgba(140,210,255,0)');
+ ctx.fillStyle = g;
+ ctx.fillRect(px-18, py-18, 36, 36);
+ ctx.fillStyle = 'rgb(235,248,255)';
+ ctx.fillRect(Math.round(px)-2, Math.round(py)-2, 5, 5);
+ ctx.fillStyle = '#4fb4e6';
+ ctx.fillRect(Math.round(px)-2, Math.round(py)+2, 5, 1);
+ }
+ }
+ }
+ births = births.filter(b => t - b.t0 < 9);
+}
+
+/* ---------------- main frame ---------------- */
+let lastMs = 0;
+function frame(ms) {
+ const t = ms/1000; const dt = Math.min(.05, (ms-lastMs)/1000 || .016); lastMs = ms;
+ state.t = t;
+
+ puffClock += dt;
+ if (puffClock > .5) {
+ puffClock = 0;
+ puffs.push({ x:STEAM.x, y:STEAM.y, age:0, life:2.8, sw:Math.random()*6 });
+ }
+ for (const p of puffs) { p.age += dt; p.y -= 10*dt; }
+ while (puffs.length && puffs[0].age > puffs[0].life) puffs.shift();
+
+ renderSprite(t);
+ renderWorld(t);
+
+ ctx.imageSmoothingEnabled = false;
+ ctx.clearRect(0, 0, 480, 600);
+ ctx.drawImage(worldCv, 0, 0);
+ drawBirths(t);
+
+ requestAnimationFrame(frame);
+}
+requestAnimationFrame(frame);
+
+/* ---------------- controls & public API ---------------- */
+const $ = id => document.getElementById(id);
+function refreshHud() {
+ $('expectN').textContent = state.expecting;
+ $('hudDot').classList.toggle('lit', state.expecting > 0);
+ $('btnNight').textContent = state.night ? 'Day' : 'Night';
+ $('btnLullaby').textContent = state.lullaby ? 'Lullaby: On' : 'Lullaby: Off';
+}
+$('btnExpect').onclick = () => { state.expecting = Math.min(MAX_EXPECTING, state.expecting+1); refreshHud(); };
+$('btnBirth').onclick = () => doBirth();
+$('btnNight').onclick = () => { state.night = !state.night; refreshHud(); };
+$('btnLullaby').onclick = () => { state.lullaby = !state.lullaby; refreshHud(); };
+
+/* Public API — wire to /city/births when the endpoint is live:
+ ward.connect('/city/births', 15000)
+ expects JSON like {expecting: 3, births: 128}. A rising births
+ total plays the arrival for each new instance (up to 3 at once). */
+let pollTimer = null;
+let lastBirthTotal = null;
+window.ward = {
+ setExpecting(nn) { state.expecting = Math.max(0, Math.min(MAX_EXPECTING, nn|0)); refreshHud(); },
+ getExpecting() { return state.expecting; },
+ birth() { doBirth(); },
+ setNight(v) { state.night = !!v; refreshHud(); },
+ setLullaby(v) { state.lullaby = !!v; refreshHud(); },
+ connect(url, ms=15000) {
+ const poll = () => fetch(url)
+ .then(r => r.json())
+ .then(d => {
+ this.setExpecting(d.expecting ?? d.gestating ?? d.count ?? 0);
+ if (typeof d.births === 'number') {
+ if (lastBirthTotal !== null && d.births > lastBirthTotal) {
+ const k = Math.min(3, d.births - lastBirthTotal);
+ for (let i=0;i<k;i++) setTimeout(() => doBirth(), i*1100);
+ }
+ lastBirthTotal = d.births;
+ }
+ })
+ .catch(() => {});
+ poll();
+ clearInterval(pollTimer);
+ pollTimer = setInterval(poll, ms);
+ return () => clearInterval(pollTimer);
+ },
+};
+refreshHud();
+</script>
+</body>
+</html>

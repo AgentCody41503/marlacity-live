@@ -1,0 +1,26 @@
+{
+  "generated": "2026-07-19T17:27:36-0400",
+  "files": [
+    "index.html",
+    "igdrasil.html",
+    "lido.html",
+    "marketlane.html",
+    "maternityward.html",
+    "postoffice.html",
+    "playground.html",
+    "watchtower.html",
+    "townhall.html",
+    "map.html",
+    "world3d.html",
+    "lib/OrbitControls.js",
+    "lib/three.module.min.js",
+    "textures/cliff.png",
+    "textures/dirt.png",
+    "textures/foliage.png",
+    "textures/grass.png",
+    "textures/plaster.png",
+    "textures/water.png",
+    "textures/wood.png"
+  ],
+  "note": "self-contained postcard bundle; numbers baked at export time"
+}
