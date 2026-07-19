@@ -6,9 +6,8 @@ redirects = []
 [functions."*"]
 
 [build]
-publish = "/Users/Cody/marla-live/site"
+publish = "/Users/Cody/marla-live"
 publishOrigin = "default"
-base = "/Users/Cody/marla-live/site"
 
 [build.environment]
 
