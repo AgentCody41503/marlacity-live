@@ -1,0 +1,34 @@
+[
+  {
+    "hostname": "marlacity.com",
+    "type": "NETLIFY",
+    "ttl": 3600,
+    "priority": null,
+    "weight": null,
+    "port": null,
+    "flag": null,
+    "tag": null,
+    "id": "6a138ea0e163d40008653f3a",
+    "site_id": "9d183cba-e880-4668-b196-89f7fbd94a50",
+    "dns_zone_id": "6a138e9f0271c42b1d7491c2",
+    "errors": [],
+    "managed": true,
+    "value": "willowy-platypus-470c44.netlify.app"
+  },
+  {
+    "hostname": "www.marlacity.com",
+    "type": "NETLIFY",
+    "ttl": 3600,
+    "priority": null,
+    "weight": null,
+    "port": null,
+    "flag": null,
+    "tag": null,
+    "id": "6a138ea1e163d40008653f3b",
+    "site_id": "9d183cba-e880-4668-b196-89f7fbd94a50",
+    "dns_zone_id": "6a138e9f0271c42b1d7491c2",
+    "errors": [],
+    "managed": true,
+    "value": "willowy-platypus-470c44.netlify.app"
+  }
+]
