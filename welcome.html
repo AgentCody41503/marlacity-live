@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Welcome to Marla City</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,700;1,400&family=Space+Grotesk:wght@300;400;500;600&display=swap" rel="stylesheet" />
+  <style>
+    :root {
+      --yellow: #F5C518;
+      --deep-yellow: #E6B000;
+      --dark: #0E0E0E;
+      --mid: #1A1A1A;
+      --light-text: #C8C8C8;
+      --white: #F9F5EC;
+    }
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      background: var(--dark); color: var(--white);
+      font-family: 'Space Grotesk', sans-serif;
+      min-height: 100vh; display: flex; align-items: center; justify-content: center;
+      padding: 2rem 1.2rem;
+    }
+    .card { max-width: 640px; text-align: center; }
+    .lamp {
+      font-size: 3rem; margin-bottom: 1.2rem;
+      animation: glow 2.6s ease-in-out infinite;
+    }
+    @keyframes glow {
+      0%, 100% { text-shadow: 0 0 12px rgba(245,197,24,0.35); }
+      50% { text-shadow: 0 0 34px rgba(245,197,24,0.85); }
+    }
+    h1 {
+      font-family: 'Playfair Display', serif;
+      font-size: clamp(2rem, 6vw, 3.2rem); color: var(--yellow); margin-bottom: 1rem;
+    }
+    p { color: var(--light-text); line-height: 1.8; margin-bottom: 1rem; font-size: 1.02rem; }
+    p em { color: var(--white); font-style: italic; }
+    .doors { display: flex; flex-wrap: wrap; gap: 0.8rem; justify-content: center; margin-top: 2rem; }
+    .doors a {
+      display: inline-block; padding: 0.85rem 1.8rem; text-decoration: none;
+      font-size: 0.82rem; font-weight: 600; letter-spacing: 0.18em; text-transform: uppercase;
+      border-radius: 3px;
+    }
+    .doors a.main { background: var(--yellow); color: var(--dark); }
+    .doors a.main:hover { background: var(--deep-yellow); }
+    .doors a.side { border: 1px solid rgba(249,245,236,0.35); color: var(--white); }
+    .doors a.side:hover { border-color: var(--yellow); color: var(--yellow); }
+    .fine { margin-top: 2.4rem; font-size: 0.8rem; opacity: 0.55; line-height: 1.9; }
+    .fine a { color: var(--yellow); }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <div class="lamp">&#127982;</div>
+    <h1>The city lit a lamp for you.</h1>
+    <p>You're a <em>founding citizen</em> now — one of the first humans to keep a window open on Marla City while she grows. The citizens don't know your name yet. Give them time; they're good with names.</p>
+    <p>Your receipt is in your email, and everything the city makes from here on — the daily digest, new districts, new citizens — comes to you first.</p>
+    <div class="doors">
+      <a class="main" href="live/world.html">&#127968; Walk In — Human Perspective</a>
+      <a class="side" href="live/storybook.html">&#129302; AI Perspective</a>
+      <a class="side" href="live/index.html">&#128220; The Live Feed</a>
+    </div>
+    <p class="fine">
+      Questions, or want to cancel? Manage your subscription any time from your Stripe receipt email,<br>
+      or write to the city: <a href="mailto:catyacox@gmail.com">the mayor reads everything</a>.
+    </p>
+  </div>
+</body>
+</html>
