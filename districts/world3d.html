@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Marla City — Storybook World</title>
+<title>Marla City — AI Perspective</title>
 <style>
   :root {
     --amber:#e8a84c; --lamp:#ffd76a; --rose:#b23a6b; --cody:#4fb4e6;
@@ -28,7 +28,7 @@
   }
   #perspective a:hover { color:#d8dce6; }
   #perspective .active { background:#232b3d; color:var(--mint); }
-  #scene { position:fixed; inset:0; display:block; cursor:grab; }
+  #scene { position:fixed; inset:0; display:block; cursor:grab; touch-action:none; }
   #scene:active { cursor:grabbing; }
   #hud {
     position:fixed; left:50%; bottom:14px; transform:translateX(-50%);
@@ -43,6 +43,15 @@
     padding:7px 10px; cursor:pointer;
   }
   #hud button:hover { border-color:var(--amber); }
+  #hud select {
+    font-family:inherit; font-size:10px; letter-spacing:1px; text-transform:uppercase;
+    background:#232b3d; color:#d8dce6; border:2px solid #3a4560;
+    padding:7px 8px; max-width:170px;
+  }
+  @media (pointer:coarse) {
+    #hud { gap:10px; padding:12px 14px; }
+    #hud button, #hud select { font-size:12px; padding:11px 12px; }
+  }
   .counter { display:flex; align-items:center; gap:7px; font-size:11px; letter-spacing:2px; text-transform:uppercase; }
   .dot { width:10px; height:10px; background:var(--lamp); border:2px solid #0a0d13; }
   .dot.live { background:var(--mint); box-shadow:0 0 8px 2px rgba(127,224,178,.7); }
@@ -81,12 +90,12 @@
 
 <nav id="perspective">
   <a href="index.html">&#128100; Human Perspective</a>
-  <span class="active">&#127912; Storybook</span>
+  <span class="active">&#129302; AI Perspective</span>
 </nav>
 
 <div id="title">
   <h1>Marla City</h1>
-  <div class="sub">the storybook rendering &middot; <span class="rose">painted light, real city</span></div>
+  <div class="sub">the ai perspective &middot; <span class="rose">painted light, real city</span></div>
 </div>
 <div id="district"></div>
 
@@ -97,6 +106,7 @@
   <div class="counter"><div class="dot" id="linkDot"></div> Citizens <span id="citN">0</span></div>
   <button id="btnCit">+ Citizen</button>
   <button id="btnTour">Tour</button>
+  <select id="selDist"><option value="">&#9992; Visit&hellip;</option><option value="ov">Overview</option></select>
   <button id="btnClock">Clock: Live</button>
 </div>
 
@@ -748,6 +758,21 @@ $('btnTour').onclick = () => {
 $('btnClock').onclick = () => { state.clockLive = !state.clockLive; ui(); };
 ui();
 setCitizens(state.citizens);
+
+/* district picker — one tap flies you there (built for phones) */
+districts.forEach((d, i) => {
+  const o = document.createElement('option');
+  o.value = i; o.textContent = d.name;
+  $('selDist').appendChild(o);
+});
+$('selDist').onchange = () => {
+  const v = $('selDist').value;
+  if (v === '') return;
+  state.tour = false;
+  flyTo(v === 'ov' ? OVERVIEW : districts[+v], 8);
+  ui();
+  $('selDist').value = '';
+};
 
 /* ---------------- animate ---------------- */
 const clock = new THREE.Clock();

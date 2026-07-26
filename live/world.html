@@ -24,7 +24,11 @@
     border-radius: 6px; box-shadow: 0 12px 40px rgba(0,0,0,0.6), inset 0 0 0 2px #57404b;
     background: var(--wood); max-width: 96vw;
   }
-  .stage { position: relative; overflow: hidden; max-width: 70vw; max-height: 72vh; background: #000; cursor: grab; }
+  .stage { position: relative; overflow: hidden; max-width: 70vw; max-height: 72vh; background: #000; cursor: grab; touch-action: none; }
+  @media (pointer:coarse) {
+    .nav-arrows { width: 100px; gap: 4px; }
+    .nav-arrows button { width: 32px; height: 32px; font-size: 15px; }
+  }
   .stage.dragging { cursor: grabbing; }
   canvas#world { display: block; image-rendering: pixelated; pointer-events: none; }
   .nav-hint {
@@ -100,7 +104,7 @@
       padding:9px 14px; background:#232b3d; color:#7fe0b2; white-space:nowrap;">
       &#128100; Human Perspective</span>
     <a href="storybook.html" style="font-size:11px; letter-spacing:2px; text-transform:uppercase; padding:9px 14px; text-decoration:none; color:#7d8598; white-space:nowrap;"
-      onmouseover="this.style.color='#d8dce6'" onmouseout="this.style.color='#7d8598'">&#127912; Storybook</a>
+      onmouseover="this.style.color='#d8dce6'" onmouseout="this.style.color='#7d8598'">&#129302; AI Perspective</a>
   </nav>
 </header>
 
