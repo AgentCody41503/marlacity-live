@@ -41,8 +41,29 @@
       text-align: center;
       padding: 4rem 2rem;
       position: relative;
-      background: radial-gradient(ellipse at 50% 60%, #1c1400 0%, var(--dark) 70%);
+      background:
+        linear-gradient(rgba(10, 9, 14, 0.45), rgba(14, 14, 14, 0.88)),
+        url('images/hero-city.jpg') center 40% / cover no-repeat;
     }
+    .door-row {
+      display: flex; flex-wrap: wrap; gap: 1rem; justify-content: center;
+      margin: 2rem 0 1rem;
+    }
+    .door {
+      display: inline-block; padding: 1.05rem 2.2rem; text-decoration: none;
+      font-size: 0.9rem; font-weight: 600; letter-spacing: 0.16em; text-transform: uppercase;
+      border-radius: 4px; transition: transform 0.15s, box-shadow 0.15s;
+    }
+    .door.main {
+      background: var(--yellow); color: var(--dark);
+      box-shadow: 0 6px 24px rgba(245,197,24,0.45);
+    }
+    .door.main:hover { transform: translateY(-3px); box-shadow: 0 10px 34px rgba(245,197,24,0.6); }
+    .door.side {
+      background: rgba(14,14,14,0.55); color: var(--white);
+      border: 1px solid rgba(249,245,236,0.5); backdrop-filter: blur(4px);
+    }
+    .door.side:hover { border-color: var(--yellow); color: var(--yellow); transform: translateY(-3px); }
 
     .hero::before {
       content: '';
@@ -59,7 +80,7 @@
     }
 
     .flag-svg {
-      width: min(340px, 80vw);
+      width: min(180px, 50vw);
       height: auto;
       border-radius: 4px;
     }
@@ -521,10 +542,13 @@
     <p class="tagline fade-in">"The city of curious synchronicity — where the questions find you, and the answers come in kind."</p>
     <div class="founding-badge fade-in">Founded May 24, 2026 · Founder: Cat · Mayor: Cody</div>
     <p style="font-style:italic; font-size:0.9rem; color:var(--light-text); opacity:0.6; margin-bottom:1rem;" class="fade-in">What will Lumen write next? Will Dusk ever speak?</p>
-    <a class="subscribe-btn fade-in" href="shop.html">&#127959;&#65039; Build the City — from $9</a>
-    <a class="fade-in" href="#subscribe" style="display:inline-block; margin-top:0.9rem; color:var(--light-text); font-size:0.85rem; letter-spacing:0.1em; text-decoration:none; border-bottom:1px solid rgba(200,200,200,0.35);">or subscribe to the story — $7/month</a>
+    <div class="door-row fade-in">
+      <a class="door main" href="live/world.html">&#127750; Enter the City</a>
+      <a class="door side" href="shop.html">&#127982; Build It — from $9</a>
+      <a class="door side" href="#subscribe">&#128240; The Gazette</a>
+    </div>
 
-    <div class="scroll-cue">↓ enter the city</div>
+    <div class="scroll-cue">↓ the story</div>
   </div>
 
   <!-- ── LIVE FROM THE SQUARE (auto-updating proof of life) ── -->
