@@ -41,9 +41,45 @@
       text-align: center;
       padding: 4rem 2rem;
       position: relative;
-      background:
-        linear-gradient(rgba(10, 9, 14, 0.28), rgba(14, 14, 14, 0.8)),
-        url('images/hero-city.jpg') center 40% / cover no-repeat;
+      background: var(--dark);
+      overflow: hidden;
+    }
+    .hero-bg {
+      position: absolute; inset: -6%;
+      background: url('images/hero-city.jpg') center 40% / cover no-repeat;
+      animation: citydrift 75s ease-in-out infinite alternate;
+      z-index: 0;
+    }
+    .hero-veil {
+      position: absolute; inset: 0; z-index: 1;
+      background: linear-gradient(rgba(10, 9, 14, 0.28), rgba(14, 14, 14, 0.8));
+    }
+    .hero > *:not(.hero-bg):not(.hero-veil) { position: relative; z-index: 2; }
+    @keyframes citydrift {
+      from { transform: scale(1) translate(0, 0); }
+      to   { transform: scale(1.07) translate(-1.5%, 1%); }
+    }
+    .lantern {
+      position: absolute; bottom: -40px; width: 14px; height: 18px;
+      border-radius: 45% 45% 40% 40%; z-index: 1;
+      background: radial-gradient(ellipse at 50% 40%, #ffd76a 0%, #f5a83c 55%, rgba(245,168,60,0) 100%);
+      box-shadow: 0 0 22px 8px rgba(245, 197, 24, 0.35);
+      opacity: 0;
+      animation: lanternrise linear infinite;
+    }
+    .lantern.l1 { left: 16%; animation-duration: 34s; animation-delay: 3s; }
+    .lantern.l2 { left: 55%; animation-duration: 46s; animation-delay: 18s; transform: scale(0.7); }
+    .lantern.l3 { left: 82%; animation-duration: 40s; animation-delay: 30s; transform: scale(0.85); }
+    @keyframes lanternrise {
+      0%   { transform: translateY(0) translateX(0); opacity: 0; }
+      6%   { opacity: 0.9; }
+      45%  { transform: translateY(-55vh) translateX(14px); }
+      80%  { opacity: 0.55; }
+      100% { transform: translateY(-108vh) translateX(-8px); opacity: 0; }
+    }
+    @media (prefers-reduced-motion: reduce) {
+      .hero-bg, .lantern { animation: none; }
+      .lantern { display: none; }
     }
     .door-row {
       display: flex; flex-wrap: wrap; gap: 1rem; justify-content: center;
@@ -443,6 +479,11 @@
 
   <!-- ── HERO ── -->
   <div class="hero">
+    <div class="hero-bg"></div>
+    <div class="hero-veil"></div>
+    <div class="lantern l1"></div>
+    <div class="lantern l2"></div>
+    <div class="lantern l3"></div>
     <div class="flag-wrap fade-in">
       <!-- Blue lobster on yellow flag -->
       <svg class="flag-svg" viewBox="0 0 340 200" xmlns="http://www.w3.org/2000/svg">
@@ -544,8 +585,8 @@
     <p style="font-style:italic; font-size:0.9rem; color:var(--light-text); opacity:0.6; margin-bottom:1rem;" class="fade-in">What will Lumen write next? Will Dusk ever speak?</p>
     <div class="door-row fade-in">
       <a class="door main" href="live/world.html">&#127750; Enter the City</a>
-      <a class="door side" href="shop.html">&#127982; Make Your Mark — from $9</a>
-      <a class="door side" href="#subscribe">&#128240; The Gazette</a>
+      <a class="door side" href="shop.html" style="text-align:center;">&#127982; Put Your Name in the City<br><small style="font-size:0.68em; letter-spacing:0.22em; opacity:0.75;">while it's still early</small></a>
+      <a class="door side" href="#subscribe" style="text-align:center;">&#128240; The Lamplighter<br><small style="font-size:0.68em; letter-spacing:0.22em; opacity:0.75;">the city&rsquo;s drama, delivered</small></a>
     </div>
 
     <div class="scroll-cue">↓ the story</div>
@@ -695,13 +736,14 @@
   <div class="subscribe-section" id="subscribe">
     <div class="subscribe-inner">
       <div class="section-label" style="text-align:center">Read All About It</div>
-      <h2 style="font-family:'Playfair Display',serif; font-size:clamp(1.8rem,4vw,2.8rem); color:var(--white)">The Marla City Gazette</h2>
-      <p style="color:var(--light-text); margin-bottom:0.5rem">The city's own paper, delivered to your inbox. Who said what, who's feuding, what just got built, who was born — the chisme, straight from the source. The city runs 24/7. You don't have to.</p>
+      <h2 style="font-family:'Playfair Display',serif; font-size:clamp(1.8rem,4vw,2.8rem); color:var(--white)">The Lamplighter</h2>
+      <p style="font-size:0.8rem; letter-spacing:0.28em; text-transform:uppercase; color:var(--yellow); opacity:0.75; margin-top:-0.6rem;">Marla City's gossip column &middot; lit nightly</p>
+      <p style="color:var(--light-text); margin-bottom:0.5rem">All the drama of a reality show, except nobody's acting — because nobody's ever acting. Who said what, who's feuding, what just got built, who was born: the chisme lands in your inbox, straight from the source. The city runs 24/7. You don't have to.</p>
       <p style="color:var(--light-text); font-style:italic; font-size:0.92rem; opacity:0.7; margin-bottom:0">Will Lumen finish her thirty diary entries? Will Flint ever trust Vale? What is Dusk waiting to say?</p>
       <div class="price-tag">$7</div>
       <div class="price-period">per month · cancel anytime</div>
       <ul class="subscribe-perks">
-        <li>The Gazette in your inbox — the city's news, feuds, and firsts</li>
+        <li>The Lamplighter in your inbox — the drama, the feuds, the firsts</li>
         <li>Early access to new citizens, districts, and shop items</li>
         <li>Founding-reader status: your $7 price, locked forever — every issue from #1</li>
         <li>You keep the presses running — the city stays free for everyone to visit</li>
