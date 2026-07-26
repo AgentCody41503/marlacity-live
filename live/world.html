@@ -32,10 +32,16 @@
   .stage.dragging { cursor: grabbing; }
   canvas#world { display: block; image-rendering: pixelated; pointer-events: none; }
   .nav-hint {
-    position: absolute; bottom: 8px; left: 50%; transform: translateX(-50%);
-    background: rgba(42,26,34,0.85); color: var(--paper); font-size: 0.62rem;
-    letter-spacing: 0.12em; padding: 4px 12px; border-radius: 3px; opacity: 0.9;
+    position: absolute; bottom: 14%; left: 50%; transform: translateX(-50%);
+    background: rgba(42,26,34,0.92); color: var(--paper); font-size: 0.85rem;
+    letter-spacing: 0.12em; padding: 10px 18px; border-radius: 24px; opacity: 0.95;
+    border: 2px solid rgba(245,168,60,0.6); white-space: nowrap;
     pointer-events: none; z-index: 10; transition: opacity 1.5s;
+    animation: hintbreathe 2.2s ease-in-out infinite;
+  }
+  @keyframes hintbreathe {
+    0%, 100% { transform: translateX(-50%) scale(1); box-shadow: 0 0 0 0 rgba(245,168,60,0.4); }
+    50% { transform: translateX(-50%) scale(1.05); box-shadow: 0 0 18px 4px rgba(245,168,60,0.25); }
   }
   .nav-arrows {
     position: absolute; bottom: 8px; right: 8px; display: flex; gap: 2px;
@@ -111,7 +117,7 @@
 <div class="frame">
   <div class="stage" id="stage">
     <canvas id="world"></canvas>
-    <div class="nav-hint" id="navHint">drag to explore the map</div>
+    <div class="nav-hint" id="navHint">&#9995; drag &mdash; the city is bigger than the window</div>
     <div class="nav-arrows">
       <button data-dx="0" data-dy="-1" style="grid-column:2" title="Up">&#9650;</button>
       <button data-dx="-1" data-dy="0" title="Left">&#9664;</button>
@@ -586,6 +592,26 @@ canvas.addEventListener('click', (ev) => {
 });
 
 clampPan();
+
+// intro sweep — glide across the map on load so nobody mistakes the window for the world
+(function introSweep() {
+  const maxX = Math.max(0, canvas.width - stage.clientWidth);
+  const maxY = Math.max(0, canvas.height - stage.clientHeight);
+  if (maxX < 40 && maxY < 40) return;   // whole map already fits
+  const toX = maxX * 0.5, toY = maxY * 0.45;
+  const dur = 3200; let start = null, cancelled = false;
+  stage.addEventListener('pointerdown', () => { cancelled = true; }, { once: true });
+  function step(ts) {
+    if (cancelled) return;
+    if (start === null) start = ts;
+    const u = Math.min(1, (ts - start) / dur);
+    const e = u * u * (3 - 2 * u);
+    panX = toX * e; panY = toY * e;
+    clampPan();
+    if (u < 1) requestAnimationFrame(step);
+  }
+  requestAnimationFrame(step);
+})();
 </script>
 </body>
 </html>
