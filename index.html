@@ -694,7 +694,7 @@
           const msg = document.getElementById('waitlist-msg');
           const email = document.getElementById('waitlist-email').value;
           try {
-            const r = await fetch('https://marlacity.com/api/waitlist', { method: 'POST',
+            const r = await fetch('https://willowy-platypus-470c44.netlify.app/api/waitlist', { method: 'POST',
               headers: { 'content-type': 'application/json' }, body: JSON.stringify({ email }) });
             const d = await r.json();
             msg.textContent = d.ok ? "You're on the list. The city will write to you." : (d.error || 'Something went wrong — try again.');
