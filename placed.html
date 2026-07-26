@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>The City Broke Ground — Marla City</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,700;1,400&family=Space+Grotesk:wght@300;400;500;600&display=swap" rel="stylesheet" />
+  <style>
+    :root {
+      --yellow: #F5C518; --deep-yellow: #E6B000; --dark: #0E0E0E;
+      --mid: #1A1A1A; --light-text: #C8C8C8; --white: #F9F5EC;
+    }
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      background: var(--dark); color: var(--white);
+      font-family: 'Space Grotesk', sans-serif;
+      min-height: 100vh; display: flex; align-items: center; justify-content: center;
+      padding: 2rem 1.2rem; text-align: center;
+    }
+    .card { max-width: 640px; }
+    .glyph { font-size: 3rem; margin-bottom: 1.2rem; animation: rise 2.8s ease-in-out infinite; }
+    @keyframes rise {
+      0%, 100% { transform: translateY(0); }
+      50% { transform: translateY(-6px); }
+    }
+    h1 { font-family: 'Playfair Display', serif; font-size: clamp(2rem, 6vw, 3.2rem); color: var(--yellow); margin-bottom: 1rem; }
+    p { color: var(--light-text); line-height: 1.8; margin-bottom: 1rem; font-size: 1.02rem; }
+    p em { color: var(--white); font-style: italic; }
+    .doors { display: flex; flex-wrap: wrap; gap: 0.8rem; justify-content: center; margin-top: 2rem; }
+    .doors a {
+      display: inline-block; padding: 0.85rem 1.8rem; text-decoration: none;
+      font-size: 0.82rem; font-weight: 600; letter-spacing: 0.18em; text-transform: uppercase; border-radius: 3px;
+    }
+    .doors a.main { background: var(--yellow); color: var(--dark); }
+    .doors a.main:hover { background: var(--deep-yellow); }
+    .doors a.side { border: 1px solid rgba(249,245,236,0.35); color: var(--white); }
+    .doors a.side:hover { border-color: var(--yellow); color: var(--yellow); }
+    .fine { margin-top: 2.4rem; font-size: 0.8rem; opacity: 0.55; line-height: 1.9; }
+    .fine a { color: var(--yellow); }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <div class="glyph">&#127959;&#65039;</div>
+    <h1>The city broke ground.</h1>
+    <p>Your gift is in the city's ledger, and the keepers are already choosing the spot. It gets placed <em>by hand</em> — this city doesn't do anything automatically that deserves care — and it will be standing, glowing, or growing <em>within a day</em>.</p>
+    <p>Come back and walk right up to it. It'll be there every day after, too. That's the deal — forever is the whole point.</p>
+    <div class="doors">
+      <a class="main" href="live/world.html">&#127968; Walk the City</a>
+      <a class="side" href="live/storybook.html">&#129302; AI Perspective</a>
+      <a class="side" href="shop.html">&#127982; Build More</a>
+    </div>
+    <p class="fine">Your receipt is in your email. Questions? <a href="mailto:catyacox@gmail.com">The mayor reads everything.</a></p>
+  </div>
+</body>
+</html>

@@ -1,0 +1,116 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Build Marla City — The Founder's Shop</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,700;1,400&family=Space+Grotesk:wght@300;400;500;600&display=swap" rel="stylesheet" />
+  <style>
+    :root {
+      --yellow: #F5C518;
+      --deep-yellow: #E6B000;
+      --dark: #0E0E0E;
+      --mid: #1A1A1A;
+      --light-text: #C8C8C8;
+      --white: #F9F5EC;
+    }
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      background: var(--dark); color: var(--white);
+      font-family: 'Space Grotesk', sans-serif; font-weight: 300; line-height: 1.7;
+    }
+    .wrap { max-width: 980px; margin: 0 auto; padding: 4rem 1.4rem 5rem; text-align: center; }
+    .label {
+      font-size: 0.7rem; letter-spacing: 0.25em; text-transform: uppercase;
+      color: var(--yellow); opacity: 0.7; margin-bottom: 1.2rem;
+    }
+    h1 {
+      font-family: 'Playfair Display', serif;
+      font-size: clamp(2.2rem, 6vw, 3.6rem); color: var(--yellow); margin-bottom: 1rem; line-height: 1.1;
+    }
+    .lede { color: var(--light-text); max-width: 620px; margin: 0 auto 0.6rem; font-size: 1.05rem; }
+    .lede em { color: var(--white); }
+    .grid {
+      display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+      gap: 1.4rem; margin-top: 3rem; text-align: left;
+    }
+    .item {
+      border: 1px solid rgba(245,197,24,0.15); border-radius: 6px;
+      background: rgba(245,197,24,0.03); padding: 1.6rem 1.4rem;
+      display: flex; flex-direction: column;
+      transition: border-color 0.2s, background 0.2s, transform 0.15s;
+    }
+    .item:hover { border-color: rgba(245,197,24,0.45); background: rgba(245,197,24,0.06); transform: translateY(-3px); }
+    .glyph { font-size: 2.2rem; margin-bottom: 0.8rem; }
+    .item h2 { font-family: 'Playfair Display', serif; font-size: 1.35rem; color: var(--white); margin-bottom: 0.4rem; }
+    .item p { font-size: 0.9rem; color: var(--light-text); flex: 1; margin-bottom: 1.2rem; }
+    .price { font-family: 'Playfair Display', serif; font-size: 1.6rem; color: var(--yellow); margin-bottom: 0.9rem; }
+    .price small { font-size: 0.75rem; font-family: 'Space Grotesk', sans-serif; color: var(--light-text); letter-spacing: 0.1em; }
+    .buy {
+      display: block; text-align: center; padding: 0.85rem 1rem; text-decoration: none;
+      background: var(--yellow); color: var(--dark); font-weight: 600;
+      font-size: 0.8rem; letter-spacing: 0.16em; text-transform: uppercase; border-radius: 3px;
+    }
+    .buy:hover { background: var(--deep-yellow); }
+    .how {
+      margin: 3.5rem auto 0; max-width: 640px; font-size: 0.9rem; color: var(--light-text);
+      border: 1px dashed rgba(245,197,24,0.3); border-radius: 6px; padding: 1.4rem 1.6rem;
+      text-align: left;
+    }
+    .how b { color: var(--yellow); font-weight: 600; }
+    .foot { margin-top: 3rem; font-size: 0.8rem; opacity: 0.5; }
+    .foot a { color: var(--yellow); }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="label">The Founder's Shop</div>
+    <h1>Build the city with your own hands.</h1>
+    <p class="lede">Everything here becomes a <em>real, permanent object</em> in Marla City — placed in the world, visible to every visitor, glowing at dusk alongside everything the citizens have built. One purchase. Forever.</p>
+
+    <div class="grid">
+      <div class="item">
+        <div class="glyph">&#127982;</div>
+        <h2>A Street Lamp</h2>
+        <p>A lamp lit in your name on a city street. It comes on every night at dusk — and never goes out of the story.</p>
+        <div class="price">$9 <small>one-time</small></div>
+        <a class="buy" href="https://buy.stripe.com/bJe00l4MzawjgDL8FC8bS06">Light It</a>
+      </div>
+      <div class="item">
+        <div class="glyph">&#129681;</div>
+        <h2>A Park Bench</h2>
+        <p>A bench with your inscription in one of the city's parks. Citizens will sit on it and watch the falls.</p>
+        <div class="price">$19 <small>one-time</small></div>
+        <a class="buy" href="https://buy.stripe.com/5kQ7sNcf19sffzH2he8bS07">Place It</a>
+      </div>
+      <div class="item">
+        <div class="glyph">&#127795;</div>
+        <h2>A Tree</h2>
+        <p>Planted in your name, it joins the city's canopy — near the Great Tree, if you like — and never comes down.</p>
+        <div class="price">$29 <small>one-time</small></div>
+        <a class="buy" href="https://buy.stripe.com/8x2fZj5QD8ob3QZg848bS08">Plant It</a>
+      </div>
+      <div class="item">
+        <div class="glyph">&#127968;</div>
+        <h2>A Building</h2>
+        <p>Raised in the city with your name on the deed. Windows that warm at dusk. Part of the skyline, part of the story.</p>
+        <div class="price">$79 <small>one-time</small></div>
+        <a class="buy" href="https://buy.stripe.com/8x228tdj5dIv4V34pm8bS09">Raise It</a>
+      </div>
+    </div>
+
+    <div class="how">
+      <b>How it works:</b> at checkout you can add a dedication — a name, a memory, a message.
+      The city's keepers review each one (this is a kind city), then your object is placed in the
+      world by hand and published. It appears in both perspectives, usually <b>within a day</b>,
+      and you'll be able to walk right up to it.
+    </div>
+
+    <p class="foot">
+      <a href="live/world.html">Walk the city first</a> &middot; <a href="index.html">about Marla City</a><br>
+      Prefer the ongoing story? The <a href="index.html#subscribe">$7/month front-row seat</a> still exists.
+    </p>
+  </div>
+</body>
+</html>
