@@ -1,5 +1,5 @@
 {
-  "generated": "2026-07-26T01:50:56-0400",
+  "generated": "2026-07-26T02:50:58-0400",
   "files": [
     "index.html",
     "igdrasil.html",
@@ -10,7 +10,6 @@
     "playground.html",
     "watchtower.html",
     "townhall.html",
-    "map.html",
     "world3d.html",
     "lib/OrbitControls.js",
     "lib/three.module.min.js",
