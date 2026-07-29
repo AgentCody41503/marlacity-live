@@ -334,7 +334,9 @@ function gable(cx, yBase, cz, hx, rise, hz, color = 0x2c3442, yaw = 0) {
   return m;
 }
 function chimney(x, y, z) {
-  box(x, y, z, .22, .5, .22, plasterMat(0x4a4438));
+  /* a real chimney: warm brick stack, wider base, stone cap */
+  box(x, y, z, .42, .6, .42, plasterMat(0x7a4a3a));
+  box(x, y + .34, z, .55, .1, .55, plasterMat(0x5a5350));
 }
 
 /* ---------------- the Great Tree ---------------- */
