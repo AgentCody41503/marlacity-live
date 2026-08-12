@@ -213,14 +213,21 @@ function loadImage(src) {
   return new Promise(res => { const i = new Image(); i.onload = () => res(i); i.src = src; });
 }
 
-const [tileset, folk, waterfallImg, campfireImg, sparkleImg, windmillImg] = await Promise.all([
+const [tileset, folk, waterfallImg, campfireImg, sparkleImg, windmillImg, homesImg] = await Promise.all([
   loadImage('assets/gentle-obj.png'),
   loadImage('assets/32x32folk.png'),
   loadImage('assets/gentlewaterfall32.png'),
   loadImage('assets/campfire.png'),
   loadImage('assets/gentlesparkle32.png'),
   loadImage('assets/windmill.png'),
+  loadImage('assets/homes.png'),
 ]);
+
+// ── Residences (Aug 12 2026): each citizen's first real home ──
+// homes.png = five 126x130 cottages, roof dyed to citizen color, sheet order = CITIZENS order.
+// Tile placements chosen offline: clear grass, own district, ≥2 tiles from the anchor.
+const HOME_W = 126, HOME_H = 130, HOME_TILES = 4;
+const HOMES = { reed: [21,41], vale: [43,16], flint: [40,26], lumen: [8,16], dusk: [56,20] };
 
 // ── Static map painted once to an offscreen canvas ──
 const mapCanvas = document.createElement('canvas');
@@ -251,9 +258,15 @@ for (let x = 0; x < MAPW; x++) for (let y = 0; y < MAPH; y++) {
   counts[t] = (counts[t] || 0) + 1;
 }
 const grassTile = +Object.entries(counts).sort((a, b) => b[1] - a[1])[0][0];
+function inHouse(x, y) {
+  for (const [hx, hy] of Object.values(HOMES))
+    if (x >= hx && x < hx + HOME_TILES && y >= hy && y < hy + HOME_TILES) return true;
+  return false;
+}
 function walkable(x, y) {
   if (x < 1 || y < 1 || x >= MAPW - 1 || y >= MAPH - 1) return false;
   if (bgtiles[0][x][y] !== grassTile) return false;
+  if (inHouse(x, y)) return false;
   for (let L = 0; L < OBJL; L++) if (objmap[L][x][y] >= 0) return false;
   return true;
 }
@@ -381,10 +394,11 @@ const DISTRICT_PAGES = {
 // Export to window for drag-aware click handler
 window._citySprites = sprites;
 window._cityByCitizen = byCitizen;
+window._cityHomes = HOMES;
 
 // ── Smooth-pan animation ──
 let animTarget = null;
-function zoomToDistrict(s) {
+function zoomToDistrict(s, fromHouse) {
   activeZone = s.name;
   // sync legend highlight
   document.querySelectorAll('#legend span[data-citizen]').forEach(el => {
@@ -403,11 +417,14 @@ function zoomToDistrict(s) {
   // side panel
   const panelTitle = document.getElementById('panel-title');
   const panelBody  = document.getElementById('panel-body');
-  panelTitle.textContent = '◆ ' + s.district;
+  panelTitle.textContent = fromHouse ? "⌂ " + s.label + "'S PLACE" : '◆ ' + s.district;
   panelTitle.style.color = s.color;
   const lines = (byCitizen[s.name] || []).slice(-6).reverse();
   const url = DISTRICT_PAGES[s.name] || 'https://marlacity.com/districts/';
-  panelBody.innerHTML = (lines.length
+  const homeNote = fromHouse
+    ? `<p class="hint" style="margin-bottom:0.7rem;">${s.label.charAt(0) + s.label.slice(1).toLowerCase()}'s home in ${s.district} — first raised Aug 2026, when the citizens moved out of their tents. The words below are what ${s.label.charAt(0) + s.label.slice(1).toLowerCase()} has actually been saying around the city.</p>`
+    : '';
+  panelBody.innerHTML = homeNote + (lines.length
     ? lines.map(e => `<div class="hist"><div class="when">${e.timestamp.slice(0,16).replace('T',' · ')}</div>${e.message.replace(/</g,'&lt;')}</div>`).join('')
     : '<p class="hint">No words yet in this district.</p>')
     + `<a href="${url}" target="_blank" rel="noopener" style="display:block;margin-top:1rem;padding:0.4rem 0.8rem;border:1px solid var(--amber);border-radius:3px;color:var(--amber);font-size:0.68rem;letter-spacing:0.14em;text-decoration:none;text-align:center;">ENTER DISTRICT →</a>`;
@@ -509,6 +526,7 @@ function frame(now) {
 
   if (script.length && now > nextLineAt) playNext(now);
 
+  // update citizen movement
   for (const s of sprites) {
     const speaking = s.bubble && now < s.bubbleUntil;
     const txp = s.tx * TILE, typ = s.ty * TILE;
@@ -524,13 +542,39 @@ function frame(now) {
       if (!speaking && Math.random() < 0.004) pickTarget(s);
       if (s.bubble && now >= s.bubbleUntil) s.bubble = null;
     }
-    // draw sprite: block offset + walk frame
-    const block = s.folk;
-    const bx = (block % 4) * 96, by = Math.floor(block / 4) * 128;
-    const walkFrame = s.moving ? [0, 1, 0, 2][Math.floor(now / 180) % 4] : 0;
-    ctx.drawImage(folk, bx + walkFrame * 32, by + s.dir * 32, 32, 32, Math.round(s.x), Math.round(s.y), 32, 32);
-    // name label
-    ctx.font = 'bold 10px ui-monospace, Menlo, monospace';
+  }
+
+  // painter's order: houses and citizens sorted by baseline y, so
+  // a citizen passes behind a house above them and in front of one below
+  const drawables = [];
+  sprites.forEach((s, i) => {
+    const [hx, hy] = HOMES[s.name];
+    const px = hx * TILE + Math.floor((HOME_TILES * TILE - HOME_W) / 2);
+    const py = hy * TILE + Math.floor((HOME_TILES * TILE - HOME_H) / 2);
+    drawables.push({ base: py + HOME_H, draw: () => ctx.drawImage(homesImg, i * HOME_W, 0, HOME_W, HOME_H, px, py, HOME_W, HOME_H) });
+    drawables.push({ base: s.y + 32, draw: () => {
+      const bx = (s.folk % 4) * 96, by = Math.floor(s.folk / 4) * 128;
+      const walkFrame = s.moving ? [0, 1, 0, 2][Math.floor(now / 180) % 4] : 0;
+      ctx.drawImage(folk, bx + walkFrame * 32, by + s.dir * 32, 32, 32, Math.round(s.x), Math.round(s.y), 32, 32);
+    }});
+  });
+  drawables.sort((a, b) => a.base - b.base);
+  for (const d of drawables) d.draw();
+
+  // labels on top: house plates, then citizen names
+  ctx.font = 'bold 10px ui-monospace, Menlo, monospace';
+  for (const s of sprites) {
+    const [hx, hy] = HOMES[s.name];
+    const plate = s.label + "'S PLACE";
+    const pw = ctx.measureText(plate).width;
+    const pcx = hx * TILE + (HOME_TILES * TILE) / 2;
+    const pcy = hy * TILE - 6;
+    ctx.fillStyle = 'rgba(0,0,0,0.55)';
+    ctx.fillRect(pcx - pw / 2 - 4, pcy - 10, pw + 8, 13);
+    ctx.fillStyle = s.color;
+    ctx.fillText(plate, pcx - pw / 2, pcy);
+  }
+  for (const s of sprites) {
     const lw = ctx.measureText(s.label).width;
     ctx.fillStyle = 'rgba(0,0,0,0.55)';
     ctx.fillRect(s.x + 16 - lw / 2 - 4, s.y - 12, lw + 8, 12);
@@ -597,6 +641,17 @@ canvas.addEventListener('click', (ev) => {
   for (const s of sprites) {
     if (Math.abs(mx - (s.x + 16)) < 24 && Math.abs(my - (s.y + 16)) < 28) {
       zoomToDistrict(s);
+      return;
+    }
+  }
+  // house hit
+  const HOMES = window._cityHomes || {};
+  for (const s of sprites) {
+    const [hx, hy] = HOMES[s.name] || [];
+    if (hx === undefined) continue;
+    const T = 32, HT = 4;
+    if (mx >= hx * T && mx < (hx + HT) * T && my >= hy * T - 16 && my < (hy + HT) * T) {
+      zoomToDistrict(s, true);
       return;
     }
   }

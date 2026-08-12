@@ -192,18 +192,18 @@ const T = {
 };
 
 const M = {
-  grass:   new THREE.MeshLambertMaterial({ map: T.grass }),
-  grassHi: new THREE.MeshLambertMaterial({ map: T.grassHi }),
-  cliff:   new THREE.MeshLambertMaterial({ map: T.cliff }),
-  wood:    new THREE.MeshLambertMaterial({ map: T.wood }),
-  trunk:   new THREE.MeshLambertMaterial({ map: T.wood, color: 0xa98868 }),
-  stone:   new THREE.MeshLambertMaterial({ map: T.plaster, color: 0x9aa2b0 }),
+  grass:   new THREE.MeshStandardMaterial({ map: T.grass, roughness: 1.0, metalness: 0 }),
+  grassHi: new THREE.MeshStandardMaterial({ map: T.grassHi, roughness: 1.0, metalness: 0 }),
+  cliff:   new THREE.MeshStandardMaterial({ map: T.cliff, roughness: .9, metalness: .05 }),
+  wood:    new THREE.MeshStandardMaterial({ map: T.wood, roughness: .8, metalness: 0 }),
+  trunk:   new THREE.MeshStandardMaterial({ map: T.wood, color: 0xa98868, roughness: .9, metalness: 0 }),
+  stone:   new THREE.MeshStandardMaterial({ map: T.plaster, color: 0x9aa2b0, roughness: .9, metalness: 0 }),
 };
 function plasterMat(color) {
-  return new THREE.MeshLambertMaterial({ map: T.plaster, color });
+  return new THREE.MeshStandardMaterial({ map: T.plaster, color, roughness: .85, metalness: .02 });
 }
 function foliageMat(color = 0xffffff) {
-  return new THREE.MeshLambertMaterial({ map: T.foliage, color, flatShading: true });
+  return new THREE.MeshStandardMaterial({ map: T.foliage, color, flatShading: true, roughness: 1.0, metalness: 0 });
 }
 
 /* ---------------- helpers ---------------- */
@@ -354,28 +354,44 @@ function chimney(x, y, z) {
 /* ---------------- districts ---------------- */
 const districts = [];
 
-/* First Morning House */
+/* First Morning House — cathedral scale */
 {
   const x = -16, z = -44, g = 1.8;
-  box(x, g + 2, z, 4.6, 2, 2.8, plasterMat(0xe0d6c4));
-  box(x - 5.4, g + 1.4, z, 1.6, 1.4, 2.2, plasterMat(0xe0d6c4));
-  box(x + 5.4, g + 1.4, z, 1.6, 1.4, 2.2, plasterMat(0xe0d6c4));
-  box(x, g + 4.2, z, 4.8, .2, 3, plasterMat(0xb23a6b));
-  box(x, g + 4.9, z, 2, .5, 2, plasterMat(0x6fae9a));
-  box(x, g + 5.7, z, 1.3, .35, 1.3, plasterMat(0x6fae9a));
-  box(x, g + 6.3, z, .6, .3, .6, plasterMat(0x5d9884));
+  /* main nave — tall and wide */
+  box(x, g + 5.0, z, 6.0, 5.0, 4.0, plasterMat(0xe0d6c4));
+  /* side wings */
+  box(x - 8.2, g + 3.2, z, 2.5, 3.2, 3.2, plasterMat(0xe0d6c4));
+  box(x + 8.2, g + 3.2, z, 2.5, 3.2, 3.2, plasterMat(0xe0d6c4));
+  /* connecting passages */
+  box(x - 6.7, g + 2.2, z, 1.6, 2.2, 2.8, plasterMat(0xd8cfc0));
+  box(x + 6.7, g + 2.2, z, 1.6, 2.2, 2.8, plasterMat(0xd8cfc0));
+  /* gable roofs */
+  gable(x, g + 10.0, z, 6.2, 3.8, 4.2, 0xb23a6b);
+  gable(x - 8.2, g + 6.4, z, 2.5, 1.8, 3.2, 0x9a2a5a);
+  gable(x + 8.2, g + 6.4, z, 2.5, 1.8, 3.2, 0x9a2a5a);
+  /* central tower */
+  box(x, g + 14.5, z, 2.1, 3.0, 2.1, plasterMat(0x6fae9a));
+  box(x, g + 17.7, z, 1.5, 0.5, 1.5, plasterMat(0x5d9884));
+  const spire = new THREE.Mesh(new THREE.ConeGeometry(2.1, 5.0, 8), plasterMat(0x4a8a72));
+  spire.position.set(x, g + 20.5, z);
+  spire.castShadow = true; spire.receiveShadow = true;
+  world.add(spire);
   /* rose door for Marla, blue for Cody */
-  box(x - 1, g + 1, z + 2.82, .55, 1, .06, plasterMat(0xb23a6b));
-  box(x + 1, g + 1, z + 2.82, .55, 1, .06, plasterMat(0x4fb4e6));
-  /* lit windows down the front wings + the rose window over the doors */
-  win(x - 3.6, g + 2.5, z + 2.83, 1.1, 1.3);
-  win(x + 3.6, g + 2.5, z + 2.83, 1.1, 1.3);
-  win(x - 6.2, g + 1.6, z + 2.23, .9, 1.0);
-  win(x + 6.2, g + 1.6, z + 2.23, .9, 1.0);
-  roundWin(x, g + 3.1, z + 2.83, .65);
-  districts.push({ name: 'First Morning House', x, z: z + 2, y: g + 2, r: 26 });
+  box(x - 1.2, g + 1.1, z + 4.02, .65, 1.1, .06, plasterMat(0xb23a6b));
+  box(x + 1.2, g + 1.1, z + 4.02, .65, 1.1, .06, plasterMat(0x4fb4e6));
+  /* tall lancet windows */
+  win(x - 4.0, g + 5.5, z + 4.03, 1.2, 3.2);
+  win(x + 4.0, g + 5.5, z + 4.03, 1.2, 3.2);
+  win(x - 8.2, g + 3.2, z + 3.23, 1.0, 1.8);
+  win(x + 8.2, g + 3.2, z + 3.23, 1.0, 1.8);
+  /* large rose window */
+  roundWin(x, g + 8.0, z + 4.03, 1.1);
+  /* chimneys */
+  chimney(x - 4.5, g + 14.0, z - 3.0);
+  chimney(x + 4.5, g + 14.0, z - 3.0);
+  districts.push({ name: 'First Morning House', x, z: z + 3, y: g + 8, r: 36 });
 }
-const WARD = new THREE.Vector3(-16, 6.2, -44);
+const WARD = new THREE.Vector3(-16, 9.0, -44);
 const TREE = new THREE.Vector3(-34, 10.6, -18);
 districts.push({ name: 'The Great Tree', x: -34, z: -18, y: 8, r: 30 });
 
@@ -480,6 +496,44 @@ const boat = new THREE.Group();
   world.add(boat);
 }
 
+/* The Moon Court — Tarot Parlor */
+{
+  const x = -7, z = 27, g = 0;
+  /* main hall — dark plum */
+  box(x, g + 3.6, z, 3.4, 3.6, 3.2, plasterMat(0x2a1840));
+  /* round turret on right-front corner */
+  const turret = new THREE.Mesh(new THREE.CylinderGeometry(1.3, 1.5, 5.5, 10), plasterMat(0x1e1030));
+  turret.position.set(x + 3.4, g + 2.75, z + 1.6);
+  turret.castShadow = true; turret.receiveShadow = true;
+  world.add(turret);
+  const turretCap = new THREE.Mesh(new THREE.ConeGeometry(1.6, 3.2, 10), plasterMat(0x3a1060));
+  turretCap.position.set(x + 3.4, g + 7.2, z + 1.6);
+  turretCap.castShadow = true; world.add(turretCap);
+  /* gable roof on main hall */
+  gable(x, g + 7.2, z, 3.6, 2.2, 3.2, 0x1a0c2a);
+  /* front step */
+  box(x, g + .15, z + 3.38, 2.0, .15, .5, M.stone);
+  /* door */
+  box(x - .6, g + 1.5, z + 3.22, .7, 1.5, .04, plasterMat(0x100808));
+  /* gold sign */
+  box(x, g + 3.8, z + 3.22, 1.8, .12, .02, plasterMat(0xe8a84c));
+  /* windows */
+  win(x - 1.8, g + 3.8, z + 3.22, .9, 2.0, 0, 0xc090ff, 0x38205a);
+  win(x + 1.4, g + 3.0, z + 3.22, .9, 1.4, 0, 0xffb86c, 0x4a2a18);
+  /* large moon circle above door */
+  roundWin(x, g + 5.8, z + 3.22, .9, 0, 0xe8d0ff, 0x5a3880);
+  /* turret front window */
+  roundWin(x + 3.4, g + 3.5, z + 3.12, .6, 0, 0xd8a0ff, 0x4a2060);
+  /* orb on pedestal */
+  box(x - 2.8, g + .6, z + 3.5, .18, .6, .18, M.stone);
+  const orbMesh = new THREE.Mesh(new THREE.SphereGeometry(.32, 16, 16),
+    new THREE.MeshBasicMaterial({ color: 0xaa50ff, transparent: true, opacity: .88 }));
+  orbMesh.position.set(x - 2.8, g + 1.52, z + 3.5);
+  world.add(orbMesh);
+  lamp(x + 4.8, z + 4.5, true);
+  districts.push({ name: 'The Moon Court — Tarot Parlor', x, z: z + 3, y: g + 4, r: 22 });
+}
+
 /* Research Row */
 {
   let rx = 14;
@@ -577,9 +631,15 @@ const starGeo = new THREE.BufferGeometry();
 const starMat = new THREE.PointsMaterial({ color: 0xdfe8ff, size: 1.6, sizeAttenuation: false, transparent: true, opacity: 0, fog: false });
 scene.add(new THREE.Points(starGeo, starMat));
 
+/* moon */
+const moonMat = new THREE.MeshBasicMaterial({ color: 0xfff5d8, fog: false, transparent: true, opacity: 0 });
+const moonMesh = new THREE.Mesh(new THREE.SphereGeometry(14, 32, 32), moonMat);
+scene.add(moonMesh);
+
 /* ---------------- citizens ---------------- */
 const POIS = [
   { x: -16, z: -40, n: 'First Morning House' },
+  { x: -7, z: 30, n: 'the Moon Court' },
   { x: -34, z: -12, n: 'the Great Tree' },
   { x: 18, z: -23, n: 'Research Row' },
   { x: 14, z: 5, n: 'the Post Office' },
@@ -598,10 +658,10 @@ world.add(citizenGroup);
 function makeCitizenMesh(hue) {
   const g = new THREE.Group();
   const body = new THREE.Mesh(new THREE.CapsuleGeometry(.28, .5, 3, 8),
-    new THREE.MeshLambertMaterial({ color: hue }));
+    new THREE.MeshStandardMaterial({ color: hue, roughness: .7, metalness: .05 }));
   body.position.y = .62; body.castShadow = true;
   const head = new THREE.Mesh(new THREE.SphereGeometry(.2, 10, 8),
-    new THREE.MeshLambertMaterial({ color: 0xe8c39a }));
+    new THREE.MeshStandardMaterial({ color: 0xe8c39a, roughness: .5, metalness: 0 }));
   head.position.y = 1.28; head.castShadow = true;
   const hit = new THREE.Mesh(new THREE.SphereGeometry(1.0, 6, 5),
     new THREE.MeshBasicMaterial({ visible: false }));
@@ -799,8 +859,13 @@ function animate() {
   scene.fog.color.setRGB(bot[0] / 255, bot[1] / 255, bot[2] / 255);
   starMat.opacity = nt * .9;
 
-  /* sun path */
+  /* moon — opposite the sun, fades in at night */
   const sa = (state.dayT - .25) * Math.PI * 2;
+  const ma = sa + Math.PI;
+  moonMesh.position.set(Math.cos(ma) * 480, Math.sin(ma) * 440, Math.sin(ma) * 50 - 60);
+  moonMat.opacity = Math.max(0, nt * .95);
+
+  /* sun path */
   const sunI = Math.max(0, Math.sin(sa));
   sun.position.set(Math.cos(sa) * 120, Math.max(8, Math.sin(sa) * 140), 60);
   sun.intensity = .15 + sunI * 1.15;
@@ -878,7 +943,7 @@ animate();
 </script>
 <script>
 /* Postcard edition — snapshot of August 12, 2026. No live wire: the city keeps its own counsel. */
-addEventListener('load', () => setCitizens(8));
+addEventListener('load', () => setCitizens(9));
 </script>
 </body>
 </html>
