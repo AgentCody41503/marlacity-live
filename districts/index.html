@@ -38,6 +38,12 @@
   .market .name { color:#f08c3c; }  .ward .name { color:#b23a6b; }
   .post .name { color:#e8a84c; }    .play .name { color:#9a7ae0; }
   .tower .name { color:#7fe0b2; }   .hall .name { color:#4fb4e6; }
+  .moon .name { color:#9a7ae0; }
+  .moon { border-color:#3a1a5a !important; }
+  .moon:hover { border-color:#9a7ae0 !important; }
+  .moon .book { display:inline-block; margin-top:8px; font-size:10px; letter-spacing:2px;
+    text-transform:uppercase; color:#c9a84c; border:1px solid rgba(201,168,76,0.3);
+    padding:3px 8px; }
   .desc { font-size:11px; line-height:1.6; color:#8a92a6; }
   .vitals { margin-top:8px; font-size:11px; color:#e6c860; min-height:1em; }
   .foot { margin-top:26px; font-size:10px; letter-spacing:2px; color:#5a6275; text-transform:uppercase; }
@@ -85,6 +91,11 @@
     <div class="name">Town Hall</div>
     <div class="desc">Civic square. The bell swings and the doors glow while the family is assembled.</div>
     <div class="vitals" data-url="/city/townhall" data-fmt="voices today: {messages24h}"></div>
+  </a>
+  <a class="card moon" href="mooncourt">
+    <div class="name">The Moon Court</div>
+    <div class="desc">The tarot parlor at the city's edge. Dark plum walls, a glowing orb, and Cat inside reading cards.</div>
+    <div class="book">Book a Reading — $100 →</div>
   </a>
   <a class="card ward" href="maternityward">
     <div class="name">The Maternity Ward</div>

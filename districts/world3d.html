@@ -74,8 +74,15 @@
   #district {
     position:fixed; top:110px; left:50%; transform:translateX(-50%); z-index:15;
     font-size:10px; letter-spacing:3px; color:var(--mint); text-transform:uppercase;
-    pointer-events:none; opacity:0; transition:opacity .6s;
+    pointer-events:none; opacity:0; transition:opacity .6s; text-align:center;
   }
+  #district a.moonlink {
+    display:block; margin-top:6px; font-size:9px; letter-spacing:2px; text-transform:uppercase;
+    color:#c9a84c; text-decoration:none; pointer-events:all;
+    border:1px solid rgba(201,168,76,0.35); padding:4px 10px;
+    background:rgba(7,5,8,0.7); transition:border-color .3s;
+  }
+  #district a.moonlink:hover { border-color:#c9a84c; }
   #wire {
     position:fixed; left:12px; bottom:14px; z-index:5; max-width:300px;
     background:rgba(20,25,38,.88); border:2px dashed #2a3145; padding:8px 11px;
@@ -133,8 +140,9 @@ import { OrbitControls } from './lib/OrbitControls.js';
    painted textures, a real sun, soft shadows, fog.
    ============================================================ */
 
-const AGENT_HUES = [0x4fb4e6, 0xe8a84c, 0xb23a6b, 0x7fe0b2, 0xd8dce6, 0x5da05a];
-const NAMES = ['Wren','Moss','Pell','Juniper','Sable','Tansy','Cobalt','Fig','Lark','Onnie','Piper','Bee','Rooke','Ivy','Ash','Clover','Dot','Ember','Fern','Gale'];
+/* first five slots are the actual citizens — colors match the 2D map */
+const AGENT_HUES = [0xe05a6e, 0x4fb4e6, 0xf08c3c, 0xe6c860, 0x9a7ae0, 0x7fe0b2, 0xd8dce6, 0x5da05a];
+const NAMES = ['Reed','Vale','Flint','Lumen','Dusk','Wren','Moss','Pell','Juniper','Sable','Tansy','Cobalt','Fig','Lark','Onnie','Piper','Bee','Rooke','Ivy','Ash'];
 const GOALS = [
   p => `heading to ${p}`, p => `visiting ${p}`, () => 'walking with nowhere to be',
   () => 'out to watch the falls', p => `meeting someone at ${p}`,
@@ -748,7 +756,10 @@ function flyTo(d, hold = 7) {
   };
   tourHold = hold;
   const el = document.getElementById('district');
-  el.textContent = d.name;
+  const isMoon = d.name.includes('Moon Court');
+  el.innerHTML = d.name + (isMoon
+    ? '<br><a class="moonlink" href="mooncourt" target="_blank">Book a Reading — $100 →</a>'
+    : '');
   el.style.opacity = 1;
   clearTimeout(el._t);
   el._t = setTimeout(() => el.style.opacity = 0, hold * 1000);
