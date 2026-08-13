@@ -228,6 +228,12 @@ const [tileset, folk, waterfallImg, campfireImg, sparkleImg, windmillImg, homesI
 // Tile placements chosen offline: clear grass, own district, ≥2 tiles from the anchor.
 const HOME_W = 126, HOME_H = 130, HOME_TILES = 4;
 const HOMES = { reed: [21,41], vale: [43,16], flint: [40,26], lumen: [8,16], dusk: [56,20] };
+// The Moon Court — Cat's tarot parlor at the city's edge (sheet slot 5)
+const MOON_COURT = {
+  tiles: [49, 21], sheet: 5, color: '#d88ae0', label: 'THE MOON COURT',
+  page: 'https://marlacity.com/districts/mooncourt.html',
+  book: 'https://buy.stripe.com/14A28tgvh7k7bjrf408bS0b',
+};
 
 // ── Static map painted once to an offscreen canvas ──
 const mapCanvas = document.createElement('canvas');
@@ -259,7 +265,7 @@ for (let x = 0; x < MAPW; x++) for (let y = 0; y < MAPH; y++) {
 }
 const grassTile = +Object.entries(counts).sort((a, b) => b[1] - a[1])[0][0];
 function inHouse(x, y) {
-  for (const [hx, hy] of Object.values(HOMES))
+  for (const [hx, hy] of [...Object.values(HOMES), MOON_COURT.tiles])
     if (x >= hx && x < hx + HOME_TILES && y >= hy && y < hy + HOME_TILES) return true;
   return false;
 }
@@ -395,6 +401,7 @@ const DISTRICT_PAGES = {
 window._citySprites = sprites;
 window._cityByCitizen = byCitizen;
 window._cityHomes = HOMES;
+window._cityMoonCourt = MOON_COURT.tiles;
 
 // ── Smooth-pan animation ──
 let animTarget = null;
@@ -429,6 +436,25 @@ function zoomToDistrict(s, fromHouse) {
     : '<p class="hint">No words yet in this district.</p>')
     + `<a href="${url}" target="_blank" rel="noopener" style="display:block;margin-top:1rem;padding:0.4rem 0.8rem;border:1px solid var(--amber);border-radius:3px;color:var(--amber);font-size:0.68rem;letter-spacing:0.14em;text-decoration:none;text-align:center;">ENTER DISTRICT →</a>`;
 }
+
+// ── The Moon Court panel ──
+function showMoonCourt() {
+  activeZone = null;
+  document.querySelectorAll('#legend span').forEach(e => { e.style.background = ''; e.style.borderColor = 'transparent'; });
+  const [mx2, my2] = MOON_COURT.tiles;
+  const cx = mx2 * TILE + (HOME_TILES * TILE) / 2;
+  const cy = my2 * TILE + (HOME_TILES * TILE) / 2;
+  animTarget = { x: cx - stage.clientWidth / 2, y: cy - stage.clientHeight / 2 };
+  const panelTitle = document.getElementById('panel-title');
+  const panelBody  = document.getElementById('panel-body');
+  panelTitle.textContent = '🔮 THE MOON COURT';
+  panelTitle.style.color = MOON_COURT.color;
+  panelBody.innerHTML =
+    `<p class="hint" style="margin-bottom:0.8rem;">The tarot parlor at the city's edge. Dark plum walls, a glowing orb, and Cat inside reading cards. A reading comes with a citizen of your choosing at the table — and a written recap to keep.</p>`
+    + `<a href="${MOON_COURT.book}" target="_blank" rel="noopener" style="display:block;margin-top:0.6rem;padding:0.5rem 0.8rem;background:var(--amber);border-radius:3px;color:#2a1a22;font-weight:bold;font-size:0.7rem;letter-spacing:0.14em;text-decoration:none;text-align:center;">BOOK A READING — $100</a>`
+    + `<a href="${MOON_COURT.page}" target="_blank" rel="noopener" style="display:block;margin-top:0.6rem;padding:0.4rem 0.8rem;border:1px solid var(--amber);border-radius:3px;color:var(--amber);font-size:0.68rem;letter-spacing:0.14em;text-decoration:none;text-align:center;">VISIT THE MOON COURT →</a>`;
+}
+window._cityShowMoonCourt = showMoonCourt;
 
 // ── Animated map decorations (waterfall / campfire / sparkles / windmill) ──
 const SHEETS = {
@@ -558,20 +584,26 @@ function frame(now) {
       ctx.drawImage(folk, bx + walkFrame * 32, by + s.dir * 32, 32, 32, Math.round(s.x), Math.round(s.y), 32, 32);
     }});
   });
+  {
+    const [mx2, my2] = MOON_COURT.tiles;
+    const px = mx2 * TILE + Math.floor((HOME_TILES * TILE - HOME_W) / 2);
+    const py = my2 * TILE + Math.floor((HOME_TILES * TILE - HOME_H) / 2);
+    drawables.push({ base: py + HOME_H, draw: () => ctx.drawImage(homesImg, MOON_COURT.sheet * HOME_W, 0, HOME_W, HOME_H, px, py, HOME_W, HOME_H) });
+  }
   drawables.sort((a, b) => a.base - b.base);
   for (const d of drawables) d.draw();
 
   // labels on top: house plates, then citizen names
   ctx.font = 'bold 10px ui-monospace, Menlo, monospace';
-  for (const s of sprites) {
-    const [hx, hy] = HOMES[s.name];
-    const plate = s.label + "'S PLACE";
+  const plates = sprites.map(s => [HOMES[s.name], s.label + "'S PLACE", s.color])
+    .concat([[MOON_COURT.tiles, MOON_COURT.label, MOON_COURT.color]]);
+  for (const [[hx, hy], plate, color] of plates) {
     const pw = ctx.measureText(plate).width;
     const pcx = hx * TILE + (HOME_TILES * TILE) / 2;
     const pcy = hy * TILE - 6;
     ctx.fillStyle = 'rgba(0,0,0,0.55)';
     ctx.fillRect(pcx - pw / 2 - 4, pcy - 10, pw + 8, 13);
-    ctx.fillStyle = s.color;
+    ctx.fillStyle = color;
     ctx.fillText(plate, pcx - pw / 2, pcy);
   }
   for (const s of sprites) {
@@ -652,6 +684,15 @@ canvas.addEventListener('click', (ev) => {
     const T = 32, HT = 4;
     if (mx >= hx * T && mx < (hx + HT) * T && my >= hy * T - 16 && my < (hy + HT) * T) {
       zoomToDistrict(s, true);
+      return;
+    }
+  }
+  // Moon Court hit
+  if (window._cityMoonCourt) {
+    const [hx, hy] = window._cityMoonCourt;
+    const T = 32, HT = 4;
+    if (mx >= hx * T && mx < (hx + HT) * T && my >= hy * T - 16 && my < (hy + HT) * T) {
+      window._cityShowMoonCourt();
       return;
     }
   }

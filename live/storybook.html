@@ -413,11 +413,11 @@ districts.push({ name: 'The Great Tree', x: -34, z: -18, y: 8, r: 30 });
 }
 
 /* Market Lane — the shops face the plaza */
-const SHOP_COLORS = [[0xb08d62, 0xb23a6b], [0x8a5340, 0x5da05a], [0x46536b, 0xe8a84c], [0xa9b3a0, 0x4fb4e6], [0x4a3527, 0xd97b4a]];
+const SHOP_COLORS = [[0xb08d62, 0xb23a6b], [0x8a5340, 0x5da05a], [0x46536b, 0xe8a84c], [0xa9b3a0, 0x4fb4e6], [0x4a3527, 0xd97b4a], [0x7a6a52, 0x9fd489], [0x5c4a5e, 0xe8c85c]];
 {
   let mx = 11;
-  const hs = [2.6, 3.4, 2.3, 3.8, 3.0];
-  for (let i = 0; i < 5; i++) {
+  const hs = [2.6, 3.4, 2.3, 3.8, 3.0, 2.7, 3.5];
+  for (let i = 0; i < SHOP_COLORS.length; i++) {
     const h = hs[i];
     box(mx, h / 2, 16, 2.1, h / 2, 1.8, plasterMat(SHOP_COLORS[i][0]));
     gable(mx, h - .02, 16, 2.1, .9 + (i % 3) * .25, 1.8, i % 2 ? 0x2c3442 : 0x3a3448);
@@ -428,6 +428,24 @@ const SHOP_COLORS = [[0xb08d62, 0xb23a6b], [0x8a5340, 0x5da05a], [0x46536b, 0xe8
     mx += 5.2;
   }
   districts.push({ name: 'Market Lane', x: 21, z: 14, y: 1.5, r: 22 });
+}
+
+/* The Moon Court — Cat's tarot parlor at the city's edge (Aug 12 2026).
+   Dark plum walls, a glowing orb in the window, a lamp lit outside. */
+{
+  const x = 48, z = 13, g = 0;
+  box(x, g + 1.5, z, 2.4, 1.5, 2.0, plasterMat(0x4a2a4e));
+  gable(x, g + 2.98, z, 2.4, 1.7, 2.0, 0x6e3a72);
+  box(x - .8, g + .95, z + 2.02, .5, .95, .05, plasterMat(0x2a1830));
+  /* the orb: a round window that glows lavender at dusk */
+  roundWin(x + .9, g + 1.7, z + 2.03, .55, 0, 0xc9a8e8, 0x6a5a7e);
+  win(x - 2.42, g + 1.6, z - .2, .9, .9, Math.PI / 2, 0xe0b8ff);
+  chimney(x + 1.5, g + 3.6, z - .7);
+  /* crescent sign over the door */
+  box(x - .8, g + 2.35, z + 2.06, .55, .09, .03, plasterMat(0xe8c85c));
+  lamp(x - 3.2, z + 3.5, true);
+  plaque('THE MOON COURT', x, g + 5.8, z, 0xd88ae0);
+  districts.push({ name: 'The Moon Court', x, z, y: 2, r: 20 });
 }
 
 /* The Windmill + Iron District */
