@@ -311,6 +311,17 @@ const sprites = Object.entries(CITIZENS).map(([name, c], i) => ({
 }));
 
 function pickTarget(s) {
+  // after dusk (viewer's clock) the citizens head home and keep near their own door
+  const hr = new Date().getHours();
+  if (hr >= 20 || hr < 6) {
+    const [hx, hy] = HOMES[s.name];
+    for (let tries = 0; tries < 8; tries++) {
+      const nx = hx + Math.floor(Math.random() * 4);
+      const ny = hy + HOME_TILES + (Math.random() < .8 ? 0 : 1);
+      if (walkable(nx, ny)) { s.tx = nx; s.ty = ny; return; }
+    }
+    return;   // nowhere clear by the door — stay put
+  }
   for (let tries = 0; tries < 12; tries++) {
     const nx = s.home.x + Math.floor(Math.random() * 9) - 4;
     const ny = s.home.y + Math.floor(Math.random() * 9) - 4;
