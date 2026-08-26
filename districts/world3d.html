@@ -347,15 +347,84 @@ function chimney(x, y, z) {
   box(x, y + .34, z, .55, .1, .55, plasterMat(0x5a5350));
 }
 
-/* ---------------- the Great Tree ---------------- */
+/* ---------------- the Great Tree ----------------
+   Grown from stacked blobs into a real tree (Aug 26 2026, Cat's wish):
+   recursive tapered limbs, foliage riding the branch tips. Seeded PRNG so
+   the Great Tree grows the same shape every visit — landmarks don't shuffle. */
 {
   const x = -34, z = -18, g = 4.0;
-  box(x, g + 1.6, z, .95, 1.6, .95, M.trunk);
-  const tiers = [[4.4, g + 3.6, 0x9fd489], [3.2, g + 5.5, 0xb2e096], [2.1, g + 7.1, 0xc8ecb0]];
-  for (const [r, y, c] of tiers) {
+  let seed = 122126;
+  const rnd = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
+  const bark = plasterMat(0x6b5140);
+  const GREENS = [0x8cc47e, 0x9fd489, 0xb2e096, 0xc8ecb0];
+  const UP = new THREE.Vector3(0, 1, 0);
+  function limb(px, py, pz, dir, len, r1, r2, depth) {
+    const ex = px + dir.x * len, ey = py + dir.y * len, ez = pz + dir.z * len;
+    const m = new THREE.Mesh(new THREE.CylinderGeometry(r2, r1, len, 7), bark);
+    m.position.set((px + ex) / 2, (py + ey) / 2, (pz + ez) / 2);
+    m.quaternion.setFromUnitVectors(UP, dir);
+    m.castShadow = true;
+    world.add(m);
+    if (depth === 0) {
+      const cl = new THREE.Mesh(
+        new THREE.IcosahedronGeometry(1.5 + rnd() * 1.2, 1),
+        foliageMat(GREENS[(rnd() * GREENS.length) | 0]));
+      cl.position.set(ex + (rnd() - .5) * .8, ey + .5 + rnd() * .6, ez + (rnd() - .5) * .8);
+      cl.castShadow = true;
+      world.add(cl);
+      return;
+    }
+    const kids = 2 + ((rnd() * 2) | 0);
+    for (let i = 0; i < kids; i++) {
+      const ang = (i / kids) * Math.PI * 2 + rnd() * 1.2;
+      const spread = .5 + rnd() * .45;
+      const nd = dir.clone()
+        .add(new THREE.Vector3(Math.cos(ang) * spread, .4 + rnd() * .35, Math.sin(ang) * spread))
+        .normalize();
+      limb(ex, ey, ez, nd, len * (.6 + rnd() * .18), r2, r2 * .55, depth - 1);
+    }
+  }
+  /* the trunk, with a slight old-tree lean, then three great limbs */
+  limb(x, g, z, new THREE.Vector3(.06, 1, -.04).normalize(), 4.8, 1.25, .95, 0);
+  const trunkTop = { x: x + .3, y: g + 4.8, z: z - .2 };
+  for (let i = 0; i < 3; i++) {
+    const ang = (i / 3) * Math.PI * 2 + .5;
+    const nd = new THREE.Vector3(Math.cos(ang) * .55, .95, Math.sin(ang) * .55).normalize();
+    limb(trunkTop.x, trunkTop.y, trunkTop.z, nd, 3.4, .8, .5, 2);
+  }
+  /* crown fill so the heart of the canopy reads full from every angle */
+  for (const [dx, dy, dz, r, c] of [
+    [0, 8.6, 0, 3.1, 0x9fd489], [-1.6, 7.6, 1.2, 2.3, 0xb2e096],
+    [1.8, 7.9, -1.0, 2.2, 0x8cc47e], [.2, 9.9, .4, 1.9, 0xc8ecb0],
+  ]) {
     const m = new THREE.Mesh(new THREE.IcosahedronGeometry(r, 1), foliageMat(c));
-    m.position.set(x + (y % 2 ? .3 : -.2), y, z + (y % 2 ? -.2 : .2));
+    m.position.set(x + dx, g + dy, z + dz);
     m.castShadow = true; world.add(m);
+  }
+  /* blossoms — rose and white dotted over the outer canopy */
+  for (let i = 0; i < 20; i++) {
+    const th = rnd() * Math.PI * 2, ph = rnd() * Math.PI * .55;
+    const rr = 3.0 + rnd() * 1.3;
+    const b = new THREE.Mesh(
+      new THREE.IcosahedronGeometry(.2 + rnd() * .16, 0),
+      new THREE.MeshLambertMaterial({ color: rnd() < .55 ? 0xe87ba8 : 0xf0ead8 }));
+    b.position.set(
+      x + Math.cos(th) * Math.sin(ph) * rr,
+      g + 8.4 + Math.cos(ph) * 2.6,
+      z + Math.sin(th) * Math.sin(ph) * rr);
+    world.add(b);
+  }
+  /* lantern-fruit — amber orbs hanging low in the canopy; they join the
+     city's lamps and glow when night comes. The tree keeps a few of the
+     lanterns it's been sent. */
+  for (let i = 0; i < 7; i++) {
+    const th = rnd() * Math.PI * 2;
+    const rr = 1.8 + rnd() * 1.8;
+    const f = new THREE.Mesh(new THREE.SphereGeometry(.26, 10, 8),
+      new THREE.MeshBasicMaterial({ color: 0xffc868 }));
+    f.position.set(x + Math.cos(th) * rr, g + 5.6 + rnd() * 1.8, z + Math.sin(th) * rr);
+    world.add(f);
+    lampGlows.push(f);
   }
 }
 
