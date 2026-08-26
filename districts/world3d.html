@@ -284,6 +284,44 @@ world.add(falls);
 /* ---------------- lamps & glow registry ---------------- */
 const lampGlows = [];   /* emissive bulbs, brightened at night */
 const lampLights = [];  /* the few real point lights */
+
+/* bloom sprites — canvas radial gradient, additive blending, fade in at night */
+const glowSpriteMats = [];
+const _glowTex = (() => {
+  const c = document.createElement('canvas'); c.width = c.height = 128;
+  const ctx = c.getContext('2d');
+  const g = ctx.createRadialGradient(64, 64, 0, 64, 64, 64);
+  g.addColorStop(0,   'rgba(255,220,100,1)');
+  g.addColorStop(.18, 'rgba(255,200, 60,.8)');
+  g.addColorStop(.55, 'rgba(255,160, 30,.2)');
+  g.addColorStop(1,   'rgba(0,0,0,0)');
+  ctx.fillStyle = g; ctx.fillRect(0, 0, 128, 128);
+  return new THREE.CanvasTexture(c);
+})();
+const _glowTexPurple = (() => {
+  const c = document.createElement('canvas'); c.width = c.height = 128;
+  const ctx = c.getContext('2d');
+  const g = ctx.createRadialGradient(64, 64, 0, 64, 64, 64);
+  g.addColorStop(0,   'rgba(200,140,255,1)');
+  g.addColorStop(.2,  'rgba(160, 80,240,.7)');
+  g.addColorStop(.6,  'rgba(100, 40,180,.15)');
+  g.addColorStop(1,   'rgba(0,0,0,0)');
+  ctx.fillStyle = g; ctx.fillRect(0, 0, 128, 128);
+  return new THREE.CanvasTexture(c);
+})();
+function glowSprite(x, y, z, size, tex) {
+  const mat = new THREE.SpriteMaterial({
+    map: tex || _glowTex, blending: THREE.AdditiveBlending,
+    depthWrite: false, transparent: true, opacity: 0,
+  });
+  const s = new THREE.Sprite(mat);
+  s.scale.set(size, size, 1);
+  s.position.set(x, y, z);
+  scene.add(s);
+  glowSpriteMats.push(mat);
+  return mat;
+}
+
 function lamp(x, z, real = false) {
   const g = terrainH(x, z);
   box(x, g + 1.1, z, .06, 1.1, .06, plasterMat(0x2a2f3c));
@@ -291,6 +329,7 @@ function lamp(x, z, real = false) {
     new THREE.MeshBasicMaterial({ color: 0xffd76a }));
   bulb.position.set(x, g + 2.3, z);
   world.add(bulb); lampGlows.push(bulb);
+  glowSprite(x, g + 2.3, z, real ? 11 : 8);
   if (real) {
     const l = new THREE.PointLight(0xffc878, 0, 16, 1.8);
     l.position.set(x, g + 2.4, z);
@@ -524,15 +563,16 @@ const SHOP_COLORS = [[0xb08d62, 0xb23a6b], [0x8a5340, 0x5da05a], [0x46536b, 0xe8
 
 /* Market Lane — south row, market stalls, clock tower */
 {
-  /* south row: 6 shops facing north across the lane toward row 1 */
+  /* south row: 5 shops facing north across the lane toward row 1
+     (stops at x≈27 to stay clear of the windmill building at x=30, z=28) */
   const ROW2 = [
     [0x7a5a30, 0x7fe0b2], [0x5a3a6a, 0xb23a6b],
     [0x4a6040, 0xe8a84c], [0x6a3030, 0x4fb4e6],
-    [0x304858, 0xd97b4a], [0xb09050, 0x9a7ae0],
+    [0x304858, 0xd97b4a],
   ];
-  const hs2 = [4.2, 6.0, 3.6, 5.4, 4.8, 7.2];
+  const hs2 = [4.2, 6.0, 3.6, 5.4, 4.8];
   let mx2 = 8;
-  for (let i = 0; i < 6; i++) {
+  for (let i = 0; i < 5; i++) {
     const h = hs2[i], hz = 2.0 + (i % 2) * .4;
     const frontZ = 26 - hz;
     box(mx2, h / 2, 26, 2.0, h / 2, hz, plasterMat(ROW2[i][0]));
@@ -545,9 +585,10 @@ const SHOP_COLORS = [[0xb08d62, 0xb23a6b], [0x8a5340, 0x5da05a], [0x46536b, 0xe8
     /* window facing north into the lane (yaw=π) */
     win(mx2 + .5, h * .5, frontZ + .04, 1.1, Math.min(h * .55, 2.0), Math.PI, 0xffe096);
     chimney(mx2 + 1.3, h + .8, 26 + hz);
-    if (i % 2 === 0) lamp(mx2 - 2.2, frontZ - 1.8);
     mx2 += 4.8;
   }
+  /* lane lamps — placed in the open lane, clear of all walls */
+  lamp(7, 21.5, true); lamp(17, 21.5); lamp(27, 21.5, true);
 
   /* market stalls — canopied counters down the lane */
   for (const [sx, sc] of [[10, 0xb23a6b], [18, 0x5da05a], [26, 0xe8a84c], [34, 0x4fb4e6]]) {
@@ -656,6 +697,7 @@ const boat = new THREE.Group();
     new THREE.MeshBasicMaterial({ color: 0xaa50ff, transparent: true, opacity: .88 }));
   orbMesh.position.set(x - 2.8, g + 1.52, z + 3.5);
   world.add(orbMesh);
+  glowSprite(x - 2.8, g + 1.52, z + 3.5, 14, _glowTexPurple);
   lamp(x + 4.8, z + 4.5, true);
   districts.push({ name: 'The Moon Court — Tarot Parlor', x, z: z + 3, y: g + 4, r: 22 });
 }
@@ -1093,6 +1135,7 @@ function animate() {
   /* lamps breathe on at night; windows warm up with them */
   for (const b of lampGlows) b.material.color.setHSL(.11, 1, .45 + nt * .35);
   for (const l of lampLights) l.intensity = nt * 2.4;
+  for (const m of glowSpriteMats) m.opacity = nt * .78;
   for (const w of windowGlows) w.mat.color.lerpColors(w.day, w.night, nt);
 
   /* water drift + falls scroll */
