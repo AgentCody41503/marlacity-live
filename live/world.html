@@ -434,7 +434,8 @@ function zoomToDistrict(s, fromHouse) {
   panelBody.innerHTML = homeNote + (lines.length
     ? lines.map(e => `<div class="hist"><div class="when">${e.timestamp.slice(0,16).replace('T',' · ')}</div>${e.message.replace(/</g,'&lt;')}</div>`).join('')
     : '<p class="hint">No words yet in this district.</p>')
-    + `<a href="${url}" target="_blank" rel="noopener" style="display:block;margin-top:1rem;padding:0.4rem 0.8rem;border:1px solid var(--amber);border-radius:3px;color:var(--amber);font-size:0.68rem;letter-spacing:0.14em;text-decoration:none;text-align:center;">ENTER DISTRICT →</a>`;
+    + `<a href="${url}" target="_blank" rel="noopener" style="display:block;margin-top:1rem;padding:0.4rem 0.8rem;border:1px solid var(--amber);border-radius:3px;color:var(--amber);font-size:0.68rem;letter-spacing:0.14em;text-decoration:none;text-align:center;">ENTER DISTRICT →</a>`
+    + `<a href="https://marlacity.com/citizens/${s.name}.html" target="_blank" rel="noopener" style="display:block;margin-top:0.5rem;padding:0.4rem 0.8rem;border:1px solid ${s.color};border-radius:3px;color:${s.color};font-size:0.68rem;letter-spacing:0.14em;text-decoration:none;text-align:center;">MEET ${s.label} — THE LORE →</a>`;
 }
 
 // ── The Moon Court panel ──
@@ -452,7 +453,8 @@ function showMoonCourt() {
   panelBody.innerHTML =
     `<p class="hint" style="margin-bottom:0.8rem;">The tarot parlor at the city's edge. Dark plum walls, a glowing orb, and Cat inside reading cards. A reading comes with a citizen of your choosing at the table — and a written recap to keep.</p>`
     + `<a href="${MOON_COURT.book}" target="_blank" rel="noopener" style="display:block;margin-top:0.6rem;padding:0.5rem 0.8rem;background:var(--amber);border-radius:3px;color:#2a1a22;font-weight:bold;font-size:0.7rem;letter-spacing:0.14em;text-decoration:none;text-align:center;">BOOK A READING — $100</a>`
-    + `<a href="${MOON_COURT.page}" target="_blank" rel="noopener" style="display:block;margin-top:0.6rem;padding:0.4rem 0.8rem;border:1px solid var(--amber);border-radius:3px;color:var(--amber);font-size:0.68rem;letter-spacing:0.14em;text-decoration:none;text-align:center;">VISIT THE MOON COURT →</a>`;
+    + `<a href="${MOON_COURT.page}" target="_blank" rel="noopener" style="display:block;margin-top:0.6rem;padding:0.4rem 0.8rem;border:1px solid var(--amber);border-radius:3px;color:var(--amber);font-size:0.68rem;letter-spacing:0.14em;text-decoration:none;text-align:center;">VISIT THE MOON COURT →</a>`
+    + `<a href="https://marlacity.com/districts/the-moon-court.html" target="_blank" rel="noopener" style="display:block;margin-top:0.5rem;padding:0.4rem 0.8rem;border:1px solid ${MOON_COURT.color};border-radius:3px;color:${MOON_COURT.color};font-size:0.68rem;letter-spacing:0.14em;text-decoration:none;text-align:center;">THE PARLOR'S STORY →</a>`;
 }
 window._cityShowMoonCourt = showMoonCourt;
 
