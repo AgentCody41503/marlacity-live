@@ -695,6 +695,28 @@ const dragonflies = [];
   }
 }
 
+/* citizen-made changes — what the citizens planted and posted, from the
+   action loop. Saplings grow with age; nobody told them to plant anything. */
+fetch('world-changes.json?t=' + Date.now()).then(r => r.json()).then(d => {
+  for (const c of (d.changes || [])) {
+    if (c.x3 == null) continue;
+    const g = terrainH(c.x3, c.z3);
+    if (c.verb === 'sign') {
+      box(c.x3, g + .55, c.z3, .06, .55, .06, M.trunk);
+      box(c.x3, g + .95, c.z3, .5, .28, .04, plasterMat(0xb08d62));
+    } else if (c.kind === 'flowers') {
+      for (let i = 0; i < 3; i++) {
+        const f = new THREE.Mesh(new THREE.IcosahedronGeometry(.13, 0),
+          new THREE.MeshLambertMaterial({ color: [0xe87ba8, 0xf0f0d8, 0xe6c860][i] }));
+        f.position.set(c.x3 + (i - 1) * .35, g + .15, c.z3 + (i % 2) * .3);
+        world.add(f);
+      }
+    } else {
+      tree(c.x3, c.z3, .45 + Math.min(c.age_days ?? 0, 30) / 30 * .5);
+    }
+  }
+}).catch(() => {});
+
 /* real weather — Columbia SC, checked every 10 minutes; fails silent */
 const RAIN_N = 900;
 const rainGeo = new THREE.BufferGeometry();

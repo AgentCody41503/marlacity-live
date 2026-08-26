@@ -257,6 +257,22 @@ for (let L = 0; L < OBJL; L++)
     for (let y = 0; y < MAPH; y++)
       drawTile(mctx, objmap[L][x][y], x * TILE, y * TILE);
 
+// ── Citizen-made changes: what the citizens planted and posted, stamped
+// onto the static map. The overlay is written by the action loop.
+const CHANGE_TILES = { sapling: 894, sign: 985 };
+const FLOWER_TILES = [278, 235, 934];
+window._cityChanges = [];
+fetch('world-changes.json?t=' + Date.now()).then(r => r.json()).then(d => {
+  for (const c of (d.changes || [])) {
+    if (c.x2 == null) continue;
+    const idx = c.verb === 'sign' ? CHANGE_TILES.sign
+      : c.kind === 'flowers' ? FLOWER_TILES[c.citizen.length % FLOWER_TILES.length]
+      : CHANGE_TILES.sapling;
+    drawTile(mctx, idx, c.x2 * TILE, c.y2 * TILE);
+    window._cityChanges.push(c);
+  }
+}).catch(() => {});
+
 // ── Walkability: dominant ground tile + no object = safe grass ──
 const counts = {};
 for (let x = 0; x < MAPW; x++) for (let y = 0; y < MAPH; y++) {
@@ -697,6 +713,21 @@ canvas.addEventListener('click', (ev) => {
     const T = 32, HT = 4;
     if (mx >= hx * T && mx < (hx + HT) * T && my >= hy * T - 16 && my < (hy + HT) * T) {
       zoomToDistrict(s, true);
+      return;
+    }
+  }
+  // citizen-made change hit (planted trees, flowers, signs)
+  for (const c of (window._cityChanges || [])) {
+    const T = 32;
+    if (mx >= c.x2 * T - 6 && mx < (c.x2 + 1) * T + 6 && my >= c.y2 * T - 6 && my < (c.y2 + 1) * T + 6) {
+      const title = document.getElementById('panel-title');
+      const body = document.getElementById('panel-body');
+      const who = c.citizen.toUpperCase();
+      title.textContent = c.verb === 'sign' ? '🪧 A SIGN' : c.kind === 'flowers' ? '🌸 FLOWERS' : '🌱 A TREE';
+      title.style.color = 'var(--amber)';
+      body.innerHTML = c.verb === 'sign'
+        ? `<p class="hint">"${c.text.replace(/</g,'&lt;')}"</p><p class="hint" style="opacity:.7">Posted by ${who} — ${c.date}, near the ${c.near}. The citizens write these themselves.</p>`
+        : `<p class="hint">${c.kind === 'flowers' ? 'Planted' : `Planted ${c.age_days} day${c.age_days === 1 ? '' : 's'} ago`} by ${who} — ${c.date}, near the ${c.near}. ${who.charAt(0) + c.citizen.slice(1)} decided to do this; nobody told them to. It stays forever.</p>`;
       return;
     }
   }
