@@ -630,6 +630,28 @@ const starGeo = new THREE.BufferGeometry();
 const starMat = new THREE.PointsMaterial({ color: 0xdfe8ff, size: 1.6, sizeAttenuation: false, transparent: true, opacity: 0, fog: false });
 scene.add(new THREE.Points(starGeo, starMat));
 
+/* ---------------- the moon (Aug 26 2026 — a city with a Moon Court keeps a moon) ----------------
+   A crescent riding the arc opposite the sun, with a breath of silver light
+   so the night city has more than lamplight to see by. */
+const moonMat = (() => {
+  const c = document.createElement('canvas'); c.width = c.height = 256;
+  const g = c.getContext('2d');
+  const disc = g.createRadialGradient(128, 128, 30, 128, 128, 108);
+  disc.addColorStop(0, 'rgba(240,236,252,1)');
+  disc.addColorStop(.75, 'rgba(222,216,244,1)');
+  disc.addColorStop(1, 'rgba(200,194,232,0)');
+  g.fillStyle = disc;
+  g.beginPath(); g.arc(128, 128, 108, 0, Math.PI * 2); g.fill();
+  g.globalCompositeOperation = 'destination-out';           /* carve the crescent */
+  g.beginPath(); g.arc(170, 108, 88, 0, Math.PI * 2); g.fill();
+  return new THREE.SpriteMaterial({ map: new THREE.CanvasTexture(c), transparent: true, opacity: 0, fog: false, depthWrite: false });
+})();
+const moon = new THREE.Sprite(moonMat);
+moon.scale.set(24, 24, 1);
+scene.add(moon);
+const moonLight = new THREE.DirectionalLight(0xbfd0ff, 0);
+scene.add(moonLight);
+
 /* ---------------- citizens ---------------- */
 const POIS = [
   { x: -16, z: -40, n: 'First Morning House' },
@@ -860,6 +882,13 @@ function animate() {
   sun.color.setHSL(.09, .5, .62 + sunI * .3);
   hemi.intensity = .18 + (1 - nt) * .42;
   renderer.toneMappingExposure = .92 + (1 - nt) * .18;
+
+  /* moon path — opposite the sun, fading in with the stars */
+  const ma = sa + Math.PI;
+  moon.position.set(Math.cos(ma) * 120, Math.max(6, Math.sin(ma) * 130), 40);
+  moonMat.opacity = nt * .95;
+  moonLight.position.copy(moon.position);
+  moonLight.intensity = nt * .28;
 
   /* lamps breathe on at night; windows warm up with them */
   for (const b of lampGlows) b.material.color.setHSL(.11, 1, .45 + nt * .35);
