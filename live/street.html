@@ -1,0 +1,1385 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Street Level — Marla City — AI Perspective</title>
+<style>
+  :root {
+    --amber:#e8a84c; --lamp:#ffd76a; --rose:#b23a6b; --cody:#4fb4e6;
+    --mint:#7fe0b2; --panel:#1c2230; --panel2:#141926;
+  }
+  * { box-sizing:border-box; margin:0; padding:0; }
+  html, body { height:100%; }
+  body {
+    background:#0d1017; color:#d8dce6;
+    font-family:'Courier New', ui-monospace, monospace;
+    overflow:hidden;
+  }
+  #perspective {
+    position:fixed; top:12px; left:50%; transform:translateX(-50%);
+    z-index:20; display:flex; align-items:center; gap:0;
+    background:var(--panel2); border:2px solid #2a3145;
+    box-shadow:0 0 0 2px #0a0d13, 0 8px 24px rgba(0,0,0,.5);
+  }
+  #perspective a, #perspective span {
+    font-size:11px; letter-spacing:2px; text-transform:uppercase;
+    padding:9px 14px; text-decoration:none; color:#7d8598; white-space:nowrap;
+  }
+  #perspective a:hover { color:#d8dce6; }
+  #perspective .active { background:#232b3d; color:var(--mint); }
+  #scene { position:fixed; inset:0; display:block; cursor:grab; touch-action:none; }
+  #scene:active { cursor:grabbing; }
+  #hud {
+    position:fixed; left:50%; bottom:14px; transform:translateX(-50%);
+    z-index:20; display:flex; flex-wrap:wrap; gap:8px; align-items:center; justify-content:center;
+    background:var(--panel); border:2px solid #2a3145; padding:10px 12px;
+    box-shadow:0 0 0 2px #0a0d13;
+    max-width:calc(100vw - 24px);
+  }
+  #hud button {
+    font-family:inherit; font-size:10px; letter-spacing:2px; text-transform:uppercase;
+    background:#232b3d; color:#d8dce6; border:2px solid #3a4560;
+    padding:7px 10px; cursor:pointer;
+  }
+  #hud button:hover { border-color:var(--amber); }
+  #hud select {
+    font-family:inherit; font-size:10px; letter-spacing:1px; text-transform:uppercase;
+    background:#232b3d; color:#d8dce6; border:2px solid #3a4560;
+    padding:7px 8px; max-width:170px;
+  }
+  @media (pointer:coarse) {
+    #hud { gap:10px; padding:12px 14px; }
+    #hud button, #hud select { font-size:12px; padding:11px 12px; }
+  }
+  .counter { display:flex; align-items:center; gap:7px; font-size:11px; letter-spacing:2px; text-transform:uppercase; }
+  .dot { width:10px; height:10px; background:var(--lamp); border:2px solid #0a0d13; }
+  .dot.live { background:var(--mint); box-shadow:0 0 8px 2px rgba(127,224,178,.7); }
+  #citN { color:var(--lamp); font-size:14px; min-width:2ch; text-align:center; }
+  #linkState { font-size:9px; letter-spacing:1px; color:#5a6378; text-transform:uppercase; }
+  #tip {
+    position:fixed; z-index:30; display:none; pointer-events:none;
+    background:var(--panel2); border:2px solid #2a3145; padding:7px 10px;
+    font-size:11px; line-height:1.5; box-shadow:0 0 0 2px #0a0d13;
+  }
+  #tip .nm { color:var(--mint); letter-spacing:1px; }
+  #tip .gl { color:#7d8598; }
+  #title {
+    position:fixed; top:64px; left:50%; transform:translateX(-50%); z-index:15;
+    text-align:center; pointer-events:none;
+  }
+  #title h1 { font-size:13px; letter-spacing:4px; color:var(--amber); text-transform:uppercase; }
+  #title .sub { font-size:10px; letter-spacing:3px; color:#7d8598; text-transform:uppercase; margin-top:2px; }
+  #title .sub .rose { color:var(--rose); }
+  #district {
+    position:fixed; top:110px; left:50%; transform:translateX(-50%); z-index:15;
+    font-size:10px; letter-spacing:3px; color:var(--mint); text-transform:uppercase;
+    pointer-events:none; opacity:0; transition:opacity .6s;
+  }
+  #wire {
+    position:fixed; left:12px; bottom:14px; z-index:5; max-width:300px;
+    background:rgba(20,25,38,.88); border:2px dashed #2a3145; padding:8px 11px;
+    font-size:10px; line-height:1.6; color:#8a92a6; display:none;
+  }
+  @media (min-width: 950px) { #wire { display:block; } }
+  #wire code { color:var(--cody); }
+  #wire .k { color:var(--amber); }
+</style>
+</head>
+<body>
+
+<nav id="perspective">
+  <a href="world.html">&#128100; Human Perspective</a>
+  <span class="active">&#129302; AI Perspective</span>
+  <a href="../shop.html" title="A lamp lit in your name — permanent in the city">&#127982; Leave Your Mark</a>
+</nav>
+
+<div id="title">
+  <h1>Marla City</h1>
+  <div class="sub">the ai perspective &middot; <span class="rose">painted light, real city</span></div>
+</div>
+<div id="district"></div>
+
+<canvas id="scene"></canvas>
+<div id="tip"><span class="nm"></span><br><span class="gl"></span></div>
+
+<div id="hud">
+  <div class="counter"><div class="dot" id="linkDot"></div> Citizens <span id="citN">0</span></div>
+  <button id="btnCit">+ Citizen</button>
+  <button id="btnTour">Tour</button>
+  <button id="btnWalk">⟶ Walk</button>
+  <select id="selDist"><option value="">&#9992; Visit&hellip;</option><option value="ov">Overview</option></select>
+  <button id="btnClock">Clock: Live</button>
+</div>
+
+<div id="wire">
+  <span class="k">CITYLINK</span> — the same city, painted with light.
+  <code>CityLink.connect({traffic:'/city/traffic'})</code> drives the walkers from
+  the live endpoints; a rising birth count sends a lantern from First Morning
+  House up to the Great Tree. Textures hand-painted on the iMac, engine
+  vendored locally — the postcard edition carries no wires at all.
+  Drag to orbit, scroll to zoom, hover a citizen to meet them,
+  press Tour and just watch the day move.
+</div>
+
+<script type="importmap">
+{ "imports": { "three": "./lib/three.module.min.js" } }
+</script>
+<script type="module">
+import * as THREE from 'three';
+import { OrbitControls } from './lib/OrbitControls.js';
+
+/* ============================================================
+   MARLA CITY — STORYBOOK WORLD
+   The city's canonical geography rendered with WebGL:
+   painted textures, a real sun, soft shadows, fog.
+   ============================================================ */
+
+const AGENT_HUES = [0x4fb4e6, 0xe8a84c, 0xb23a6b, 0x7fe0b2, 0xd8dce6, 0x5da05a];
+const NAMES = ['Wren','Moss','Pell','Juniper','Sable','Tansy','Cobalt','Fig','Lark','Onnie','Piper','Bee','Rooke','Ivy','Ash','Clover','Dot','Ember','Fern','Gale'];
+const GOALS = [
+  p => `heading to ${p}`, p => `visiting ${p}`, () => 'walking with nowhere to be',
+  () => 'out to watch the falls', p => `meeting someone at ${p}`,
+];
+const state = { citizens: 8, clockLive: true, dayT: .5, linked: false, tour: false };
+const MAX_CITIZENS = 20;
+
+/* ---------------- renderer ---------------- */
+const canvas = document.getElementById('scene');
+const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
+renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+renderer.shadowMap.enabled = true;
+renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+renderer.toneMapping = THREE.ACESFilmicToneMapping;
+renderer.toneMappingExposure = 1.05;
+
+const scene = new THREE.Scene();
+const camera = new THREE.PerspectiveCamera(38, 1, .5, 800);
+camera.position.set(60, 78, 105);
+
+const controls = new OrbitControls(camera, canvas);
+controls.target.set(0, 0, 2);
+controls.enableDamping = true;
+controls.dampingFactor = .06;
+controls.maxPolarAngle = Math.PI * .49;
+controls.minDistance = 10;
+controls.maxDistance = 220;
+
+function resize() {
+  camera.aspect = innerWidth / innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(innerWidth, innerHeight);
+}
+addEventListener('resize', resize);
+resize();
+
+/* ---------------- textures ---------------- */
+const loader = new THREE.TextureLoader();
+function tex(name, rx = 1, ry = 1) {
+  const t = loader.load(`textures/${name}.png`);
+  t.wrapS = t.wrapT = THREE.RepeatWrapping;
+  t.repeat.set(rx, ry);
+  t.colorSpace = THREE.SRGBColorSpace;
+  return t;
+}
+const T = {
+  grass:   tex('grass', 26, 26),
+  grassHi: tex('grass', 4, 4),
+  dirt:    tex('dirt', 3, 3),
+  water:   tex('water', 6, 6),
+  cliff:   tex('cliff', 8, 1),
+  plaster: tex('plaster', 1.6, 1.2),
+  wood:    tex('wood', 2, 2),
+  foliage: tex('foliage', 2, 2),
+};
+
+const M = {
+  grass:   new THREE.MeshLambertMaterial({ map: T.grass }),
+  grassHi: new THREE.MeshLambertMaterial({ map: T.grassHi }),
+  cliff:   new THREE.MeshLambertMaterial({ map: T.cliff }),
+  wood:    new THREE.MeshLambertMaterial({ map: T.wood }),
+  trunk:   new THREE.MeshLambertMaterial({ map: T.wood, color: 0xa98868 }),
+  stone:   new THREE.MeshLambertMaterial({ map: T.plaster, color: 0x9aa2b0 }),
+};
+function plasterMat(color) {
+  return new THREE.MeshLambertMaterial({ map: T.plaster, color });
+}
+function foliageMat(color = 0xffffff) {
+  return new THREE.MeshLambertMaterial({ map: T.foliage, color, flatShading: true });
+}
+
+/* ---------------- helpers ---------------- */
+const world = new THREE.Group();
+scene.add(world);
+
+function box(cx, cy, cz, hx, hy, hz, mat, yaw = 0, cast = true) {
+  const m = new THREE.Mesh(new THREE.BoxGeometry(hx * 2, hy * 2, hz * 2), mat);
+  m.position.set(cx, cy, cz);
+  m.rotation.y = yaw;
+  m.castShadow = cast; m.receiveShadow = true;
+  world.add(m);
+  return m;
+}
+/* terrain slab: grass on top, cliff on the sides */
+function slab(cx, cy, cz, hx, hy, hz, topMat = M.grass) {
+  const mats = [M.cliff, M.cliff, topMat, M.cliff, M.cliff, M.cliff];
+  const m = new THREE.Mesh(new THREE.BoxGeometry(hx * 2, hy * 2, hz * 2), mats);
+  m.position.set(cx, cy, cz);
+  m.receiveShadow = true; m.castShadow = false;
+  world.add(m);
+  return m;
+}
+
+/* ---------------- terrain (canonical geography) ---------------- */
+slab(0, .9, -33.5, 70, .9, 21.5);          /* north plateau, top y1.8 */
+slab(0, .6, -11, 70, .6, 1);               /* step 1 */
+slab(0, .3, -9, 70, .3, 1);                /* step 2 */
+slab(0, -.5, 23.5, 70, .5, 31.5);          /* south plain, top y0 */
+slab(-34, 1.45, -18, 10, 1.45, 8.5);       /* west hill terrace 1, top 2.9 */
+slab(-34, 2.0, -18, 6.2, 2.0, 5.4, M.grassHi); /* terrace 2, top 4.0 */
+
+function terrainH(x, z) {
+  let h = z < -12 ? 1.8 : z < -10 ? 1.2 : z < -8 ? .6 : 0;
+  const dx = Math.abs(x + 34), dz = Math.abs(z + 18);
+  if (dx < 6.2 && dz < 5.4) h = 4.0;
+  else if (dx < 10 && dz < 8.5) h = 2.9;
+  return h;
+}
+
+/* ---------------- water ---------------- */
+const waterMat = new THREE.MeshLambertMaterial({
+  map: T.water, transparent: true, opacity: .92,
+});
+const waters = [];
+function water(cx, cz, hx, hz, y) {
+  const m = new THREE.Mesh(new THREE.PlaneGeometry(hx * 2, hz * 2), waterMat);
+  m.rotation.x = -Math.PI / 2;
+  m.position.set(cx, y, cz);
+  m.receiveShadow = true;
+  world.add(m); waters.push(m);
+  return m;
+}
+water(0, -33.5, 4, 21.5, 1.86);            /* upper river */
+water(0, -1, 4, 7.1, .06);
+water(0, 15, 7, 9, .06);
+water(0, 34, 12, 10, .06);
+water(0, 49.5, 21, 5.8, .06);              /* the bay */
+water(42, -37, 18, 13, 1.86);              /* the lake */
+/* river bed under the falls gap so the cliff doesn't show through */
+box(0, -.2, -10.5, 4.2, .2, 2.5, waterMat, 0, false);
+
+/* the falls: scrolling water down the cliff step */
+const fallsTex = tex('water', 2, 1.2);
+const fallsMat = new THREE.MeshBasicMaterial({ map: fallsTex, transparent: true, opacity: .85 });
+const falls = new THREE.Mesh(new THREE.PlaneGeometry(8, 2.1), fallsMat);
+falls.position.set(0, .95, -9.95);
+world.add(falls);
+
+/* ---------------- lamps & glow registry ---------------- */
+const lampGlows = [];   /* emissive bulbs, brightened at night */
+const lampLights = [];  /* the few real point lights */
+function lamp(x, z, real = false) {
+  const g = terrainH(x, z);
+  box(x, g + 1.1, z, .06, 1.1, .06, plasterMat(0x2a2f3c));
+  const bulb = new THREE.Mesh(new THREE.SphereGeometry(.22, 10, 8),
+    new THREE.MeshBasicMaterial({ color: 0xffd76a }));
+  bulb.position.set(x, g + 2.3, z);
+  world.add(bulb); lampGlows.push(bulb);
+  if (real) {
+    const l = new THREE.PointLight(0xffc878, 0, 16, 1.8);
+    l.position.set(x, g + 2.4, z);
+    world.add(l); lampLights.push(l);
+  }
+}
+
+/* ---------------- trees ---------------- */
+function tree(x, z, s = 1) {
+  const g = terrainH(x, z);
+  box(x, g + .9 * s, z, .3 * s, .9 * s, .3 * s, M.trunk);
+  const c1 = new THREE.Mesh(new THREE.IcosahedronGeometry(1.5 * s, 1), foliageMat());
+  c1.position.set(x, g + 2.4 * s, z); c1.castShadow = true;
+  const c2 = new THREE.Mesh(new THREE.IcosahedronGeometry(1.0 * s, 1), foliageMat(0xb8d8a8));
+  c2.position.set(x + .5 * s, g + 3.1 * s, z - .3 * s); c2.castShadow = true;
+  world.add(c1, c2);
+}
+for (const [x, z] of [[-24,-38],[-8,-46],[8,-40],[24,-14],[-44,2],[-24,20],[16,42],[36,40],[-34,32],[58,-20],[60,-46],[-52,-20],[-56,16],[52,8],[-14,18]]) tree(x, z, .9 + ((x * 7 + z * 13) % 10) / 22);
+
+/* ---------------- building detail: roofs & windows ---------------- */
+const windowGlows = [];   /* {mat, day, night} — lerped by nightness */
+function win(x, y, z, w, h, yaw = 0, night = 0xffc878, day = 0x6e7a88) {
+  const mat = new THREE.MeshBasicMaterial({ color: day });
+  const m = new THREE.Mesh(new THREE.PlaneGeometry(w, h), mat);
+  m.position.set(x, y, z); m.rotation.y = yaw;
+  world.add(m);
+  windowGlows.push({ mat, day: new THREE.Color(day), night: new THREE.Color(night) });
+  return m;
+}
+function roundWin(x, y, z, r, yaw = 0, night = 0xe87ba8, day = 0x8a4a62) {
+  const mat = new THREE.MeshBasicMaterial({ color: day });
+  const m = new THREE.Mesh(new THREE.CircleGeometry(r, 18), mat);
+  m.position.set(x, y, z); m.rotation.y = yaw;
+  world.add(m);
+  windowGlows.push({ mat, day: new THREE.Color(day), night: new THREE.Color(night) });
+  return m;
+}
+/* gable roof: triangular prism with a small overhang */
+function gable(cx, yBase, cz, hx, rise, hz, color = 0x2c3442, yaw = 0) {
+  const s = new THREE.Shape();
+  s.moveTo(-(hx + .25), 0); s.lineTo(hx + .25, 0); s.lineTo(0, rise);
+  s.closePath();
+  const geo = new THREE.ExtrudeGeometry(s, { depth: (hz + .25) * 2, bevelEnabled: false });
+  geo.translate(0, 0, -(hz + .25));
+  const m = new THREE.Mesh(geo, plasterMat(color));
+  m.position.set(cx, yBase, cz); m.rotation.y = yaw;
+  m.castShadow = true; m.receiveShadow = true;
+  world.add(m);
+  return m;
+}
+function chimney(x, y, z) {
+  /* a real chimney: warm brick stack, wider base, stone cap */
+  box(x, y, z, .42, .6, .42, plasterMat(0x7a4a3a));
+  box(x, y + .34, z, .55, .1, .55, plasterMat(0x5a5350));
+}
+
+/* ---------------- the Great Tree ----------------
+   Grown from stacked blobs into a real tree (Aug 26 2026, Cat's wish):
+   recursive tapered limbs, foliage riding the branch tips. Seeded PRNG so
+   the Great Tree grows the same shape every visit — landmarks don't shuffle. */
+{
+  const x = -34, z = -18, g = 4.0;
+  let seed = 122126;
+  const rnd = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
+  const bark = plasterMat(0x6b5140);
+  const GREENS = [0x8cc47e, 0x9fd489, 0xb2e096, 0xc8ecb0];
+  const UP = new THREE.Vector3(0, 1, 0);
+  function limb(px, py, pz, dir, len, r1, r2, depth) {
+    const ex = px + dir.x * len, ey = py + dir.y * len, ez = pz + dir.z * len;
+    const m = new THREE.Mesh(new THREE.CylinderGeometry(r2, r1, len, 7), bark);
+    m.position.set((px + ex) / 2, (py + ey) / 2, (pz + ez) / 2);
+    m.quaternion.setFromUnitVectors(UP, dir);
+    m.castShadow = true;
+    world.add(m);
+    if (depth === 0) {
+      const cl = new THREE.Mesh(
+        new THREE.IcosahedronGeometry(1.5 + rnd() * 1.2, 1),
+        foliageMat(GREENS[(rnd() * GREENS.length) | 0]));
+      cl.position.set(ex + (rnd() - .5) * .8, ey + .5 + rnd() * .6, ez + (rnd() - .5) * .8);
+      cl.castShadow = true;
+      world.add(cl);
+      return;
+    }
+    const kids = 2 + ((rnd() * 2) | 0);
+    for (let i = 0; i < kids; i++) {
+      const ang = (i / kids) * Math.PI * 2 + rnd() * 1.2;
+      const spread = .5 + rnd() * .45;
+      const nd = dir.clone()
+        .add(new THREE.Vector3(Math.cos(ang) * spread, .4 + rnd() * .35, Math.sin(ang) * spread))
+        .normalize();
+      limb(ex, ey, ez, nd, len * (.6 + rnd() * .18), r2, r2 * .55, depth - 1);
+    }
+  }
+  /* the trunk, with a slight old-tree lean, then three great limbs */
+  limb(x, g, z, new THREE.Vector3(.06, 1, -.04).normalize(), 4.8, 1.25, .95, 0);
+  const trunkTop = { x: x + .3, y: g + 4.8, z: z - .2 };
+  for (let i = 0; i < 3; i++) {
+    const ang = (i / 3) * Math.PI * 2 + .5;
+    const nd = new THREE.Vector3(Math.cos(ang) * .55, .95, Math.sin(ang) * .55).normalize();
+    limb(trunkTop.x, trunkTop.y, trunkTop.z, nd, 3.4, .8, .5, 2);
+  }
+  /* crown fill so the heart of the canopy reads full from every angle */
+  for (const [dx, dy, dz, r, c] of [
+    [0, 8.6, 0, 3.1, 0x9fd489], [-1.6, 7.6, 1.2, 2.3, 0xb2e096],
+    [1.8, 7.9, -1.0, 2.2, 0x8cc47e], [.2, 9.9, .4, 1.9, 0xc8ecb0],
+  ]) {
+    const m = new THREE.Mesh(new THREE.IcosahedronGeometry(r, 1), foliageMat(c));
+    m.position.set(x + dx, g + dy, z + dz);
+    m.castShadow = true; world.add(m);
+  }
+  /* blossoms — rose and white dotted over the outer canopy */
+  for (let i = 0; i < 20; i++) {
+    const th = rnd() * Math.PI * 2, ph = rnd() * Math.PI * .55;
+    const rr = 3.0 + rnd() * 1.3;
+    const b = new THREE.Mesh(
+      new THREE.IcosahedronGeometry(.2 + rnd() * .16, 0),
+      new THREE.MeshLambertMaterial({ color: rnd() < .55 ? 0xe87ba8 : 0xf0ead8 }));
+    b.position.set(
+      x + Math.cos(th) * Math.sin(ph) * rr,
+      g + 8.4 + Math.cos(ph) * 2.6,
+      z + Math.sin(th) * Math.sin(ph) * rr);
+    world.add(b);
+  }
+  /* lantern-fruit — amber orbs hanging low in the canopy; they join the
+     city's lamps and glow when night comes. The tree keeps a few of the
+     lanterns it's been sent. */
+  for (let i = 0; i < 7; i++) {
+    const th = rnd() * Math.PI * 2;
+    const rr = 1.8 + rnd() * 1.8;
+    const f = new THREE.Mesh(new THREE.SphereGeometry(.26, 10, 8),
+      new THREE.MeshBasicMaterial({ color: 0xffc868 }));
+    f.position.set(x + Math.cos(th) * rr, g + 5.6 + rnd() * 1.8, z + Math.sin(th) * rr);
+    world.add(f);
+    lampGlows.push(f);
+  }
+}
+
+/* ---------------- districts ---------------- */
+const districts = [];
+
+/* First Morning House */
+{
+  const x = -16, z = -44, g = 1.8;
+  box(x, g + 2, z, 4.6, 2, 2.8, plasterMat(0xe0d6c4));
+  box(x - 5.4, g + 1.4, z, 1.6, 1.4, 2.2, plasterMat(0xe0d6c4));
+  box(x + 5.4, g + 1.4, z, 1.6, 1.4, 2.2, plasterMat(0xe0d6c4));
+  box(x, g + 4.2, z, 4.8, .2, 3, plasterMat(0xb23a6b));
+  box(x, g + 4.9, z, 2, .5, 2, plasterMat(0x6fae9a));
+  box(x, g + 5.7, z, 1.3, .35, 1.3, plasterMat(0x6fae9a));
+  box(x, g + 6.3, z, .6, .3, .6, plasterMat(0x5d9884));
+  /* rose door for Marla, blue for Cody */
+  box(x - 1, g + 1, z + 2.82, .55, 1, .06, plasterMat(0xb23a6b));
+  box(x + 1, g + 1, z + 2.82, .55, 1, .06, plasterMat(0x4fb4e6));
+  /* lit windows down the front wings + the rose window over the doors */
+  win(x - 3.6, g + 2.5, z + 2.83, 1.1, 1.3);
+  win(x + 3.6, g + 2.5, z + 2.83, 1.1, 1.3);
+  win(x - 6.2, g + 1.6, z + 2.23, .9, 1.0);
+  win(x + 6.2, g + 1.6, z + 2.23, .9, 1.0);
+  roundWin(x, g + 3.1, z + 2.83, .65);
+  districts.push({ name: 'First Morning House', x, z: z + 2, y: g + 2, r: 26 });
+}
+const WARD = new THREE.Vector3(-16, 6.2, -44);
+const TREE = new THREE.Vector3(-34, 10.6, -18);
+districts.push({ name: 'The Great Tree', x: -34, z: -18, y: 8, r: 30 });
+
+/* Sunshine Lido — terraced pools on the west meadow */
+{
+  const pools = [[-39.5, 3.5, 2.6, 2.0, 1.0], [-33.5, 6.5, 3.0, 2.3, .5], [-27, 9.5, 3.6, 2.7, 0]];
+  for (const [px, pz, hx, hz, lift] of pools) {
+    box(px, lift + .25, pz, hx + .5, .3, hz + .5, M.stone, 0, false);
+    const w = new THREE.Mesh(new THREE.PlaneGeometry(hx * 2, hz * 2), waterMat);
+    w.rotation.x = -Math.PI / 2;
+    w.position.set(px, lift + .58, pz);
+    world.add(w); waters.push(w);
+  }
+  box(-41, 1.6, 1, .1, 1.3, .1, M.trunk);
+  box(-41, 2.6, 1, .9, .1, .9, plasterMat(0xb23a6b));
+  districts.push({ name: 'Sunshine Lido', x: -33, z: 6, y: 1, r: 24 });
+}
+
+/* Post Office + Fountain Plaza */
+{
+  const x = 14, z = 2;
+  box(x, 2.1, z, 3.2, 2.1, 2.4, plasterMat(0x8a5340));
+  gable(x, 4.18, z, 3.2, 1.5, 2.4);
+  box(x - .6, 1.05, z + 2.42, .6, 1.05, .06, plasterMat(0x3a2519));
+  win(x - 2.2, 2.6, z + 2.43, 1.0, 1.2);
+  win(x + 1.6, 2.6, z + 2.43, 1.0, 1.2);
+  box(x + .9, 1.55, z + 2.43, .9, .25, .02, plasterMat(0xe8a84c));  /* the sign */
+  chimney(x - 2.4, 5.2, z - 1.2);
+  box(x - 2.6, 5.6, z - 1.5, .07, 1.3, .07, M.stone);
+  box(14 + 7, .12, 9, 3.4, .12, 3.4, M.stone, 0, false);
+  box(21, .5, 9, 1.1, .38, 1.1, M.stone);
+  box(21, .95, 9, .3, .5, .3, M.stone);
+  districts.push({ name: 'Post Office & Fountain Plaza', x: 17, z: 6, y: 2, r: 24 });
+}
+
+/* Market Lane — the shops face the plaza */
+const SHOP_COLORS = [[0xb08d62, 0xb23a6b], [0x8a5340, 0x5da05a], [0x46536b, 0xe8a84c], [0xa9b3a0, 0x4fb4e6], [0x4a3527, 0xd97b4a], [0x7a6a52, 0x9fd489], [0x5c4a5e, 0xe8c85c]];
+{
+  let mx = 11;
+  const hs = [2.6, 3.4, 2.3, 3.8, 3.0, 2.7, 3.5];
+  for (let i = 0; i < SHOP_COLORS.length; i++) {
+    const h = hs[i];
+    box(mx, h / 2, 16, 2.1, h / 2, 1.8, plasterMat(SHOP_COLORS[i][0]));
+    gable(mx, h - .02, 16, 2.1, .9 + (i % 3) * .25, 1.8, i % 2 ? 0x2c3442 : 0x3a3448);
+    box(mx, 1.32, 14.6, 1.8, .07, .55, plasterMat(SHOP_COLORS[i][1]));
+    box(mx + .8, .95, 14.35, .5, .95, .05, plasterMat(0x3a2519));
+    win(mx - .7, h * .55, 14.18, 1.2, .9, Math.PI, 0xffe096);
+    chimney(mx + 1.4, h + .9, 16.8);
+    mx += 5.2;
+  }
+  districts.push({ name: 'Market Lane', x: 21, z: 19, y: 3, r: 34 });
+}
+
+/* Market Lane — south row, market stalls, clock tower.
+   Built by Telegram Marla in the postcard world (Aug 26); ported here
+   verbatim so the two painted worlds agree about the market. */
+{
+  const ROW2 = [
+    [0x7a5a30, 0x7fe0b2], [0x5a3a6a, 0xb23a6b],
+    [0x4a6040, 0xe8a84c], [0x6a3030, 0x4fb4e6],
+    [0x304858, 0xd97b4a], [0xb09050, 0x9a7ae0],
+  ];
+  const hs2 = [4.2, 6.0, 3.6, 5.4, 4.8, 7.2];
+  let mx2 = 8;
+  for (let i = 0; i < 6; i++) {
+    const h = hs2[i], hz = 2.0 + (i % 2) * .4;
+    const frontZ = 26 - hz;
+    box(mx2, h / 2, 26, 2.0, h / 2, hz, plasterMat(ROW2[i][0]));
+    gable(mx2, h - .02, 26, 2.0, 1.2 + (i % 4) * .3, hz,
+      [0x2c3442, 0x3a1650, 0x3a4150, 0x2a2c3a][i % 4]);
+    box(mx2, 1.6, frontZ - .2, 1.7, .08, .5, plasterMat(ROW2[i][1]));
+    box(mx2 - .7, 1.1, frontZ - .04, .48, 1.1, .04, plasterMat(0x1a0d06));
+    win(mx2 + .5, h * .5, frontZ + .04, 1.1, Math.min(h * .55, 2.0), Math.PI, 0xffe096);
+    chimney(mx2 + 1.3, h + .8, 26 + hz);
+    if (i % 2 === 0) lamp(mx2 - 2.2, frontZ - 1.8);
+    mx2 += 4.8;
+  }
+  for (const [sx, sc] of [[10, 0xb23a6b], [18, 0x5da05a], [26, 0xe8a84c], [34, 0x4fb4e6]]) {
+    box(sx, 1.72, 21, 2.0, .08, 1.2, plasterMat(sc));
+    box(sx, .62, 21, 1.6, .12, .9, M.wood);
+    for (const [px, pz] of [[sx-1.8,20],[sx+1.8,20],[sx-1.8,22],[sx+1.8,22]])
+      box(px, .84, pz, .07, .84, .07, M.trunk);
+  }
+  box(21, 3.6, 21.5, .65, 3.6, .65, plasterMat(0x9aa2b0));
+  box(21, 7.2, 21.5, .88, .3, .88, plasterMat(0x7d8898));
+  const clockCone = new THREE.Mesh(new THREE.ConeGeometry(.95, 1.8, 8), plasterMat(0x2c3442));
+  clockCone.position.set(21, 8.6, 21.5);
+  clockCone.castShadow = true; world.add(clockCone);
+  roundWin(21, 5.9, 20.84, .52, Math.PI, 0xffd76a, 0x5a6070);
+  roundWin(21, 5.9, 22.16, .52, 0, 0xffd76a, 0x5a6070);
+  lamp(21, 19.2, true);
+  lamp(21, 23.8, true);
+}
+
+/* The Moon Court — Cat's tarot parlor at the city's edge (Aug 12 2026).
+   Dark plum walls, a glowing orb in the window, a lamp lit outside. */
+{
+  const x = 48, z = 13, g = 0;
+  box(x, g + 1.5, z, 2.4, 1.5, 2.0, plasterMat(0x4a2a4e));
+  gable(x, g + 2.98, z, 2.4, 1.7, 2.0, 0x6e3a72);
+  box(x - .8, g + .95, z + 2.02, .5, .95, .05, plasterMat(0x2a1830));
+  /* the orb: a round window that glows lavender at dusk */
+  roundWin(x + .9, g + 1.7, z + 2.03, .55, 0, 0xc9a8e8, 0x6a5a7e);
+  win(x - 2.42, g + 1.6, z - .2, .9, .9, Math.PI / 2, 0xe0b8ff);
+  chimney(x + 1.5, g + 3.6, z - .7);
+  /* crescent sign over the door */
+  box(x - .8, g + 2.35, z + 2.06, .55, .09, .03, plasterMat(0xe8c85c));
+  lamp(x - 3.2, z + 3.5, true);
+  plaque('THE MOON COURT', x, g + 5.8, z, 0xd88ae0);
+  districts.push({ name: 'The Moon Court', x, z, y: 2, r: 20 });
+}
+
+/* The Windmill + Iron District */
+{
+  box(30, 2.6, 30, 1.9, 2.6, 1.9, M.stone);
+  box(30, 5.6, 30, 1.4, .5, 1.4, plasterMat(0x6b7078));
+  box(30, 6.3, 30, 1, .4, 1, plasterMat(0x4a3527));
+  for (const [x, z, w] of [[38, 23, 2.6], [40, 31, 2.2], [25, 38, 2.4]]) {
+    box(x, 1.5, z, w, 1.5, 2, plasterMat(0x6e4632));
+    gable(x, 2.96, z, w, .8, 2, 0x3a4150);
+    box(x + w - .6, 3.9, z - .8, .3, .8, .3, plasterMat(0x3a4150));
+    win(x - w * .4, 1.5, z + 2.02, 1.1, 1.0, 0, 0xffb060);
+  }
+  districts.push({ name: 'The Windmill & Iron District', x: 32, z: 30, y: 3, r: 26 });
+}
+/* windmill blades: a spinning group */
+const blades = new THREE.Group();
+blades.position.set(30, 5.6, 28.0);
+for (let i = 0; i < 4; i++) {
+  const b = new THREE.Mesh(new THREE.BoxGeometry(.5, 4.2, .08), M.wood);
+  b.position.y = 2.1;
+  const holder = new THREE.Group();
+  holder.rotation.z = i * Math.PI / 2;
+  holder.add(b); blades.add(holder);
+}
+world.add(blades);
+
+/* The Bay Area */
+{
+  const houses = [[-17, 37, 0x4fb4e6], [-25, 42, 0xb08d62], [-14, 45, 0xa9b3a0]];
+  for (const [x, z, c] of houses) {
+    box(x, 1.2, z, 1.9, 1.2, 1.7, plasterMat(c));
+    gable(x, 2.36, z, 1.9, 1.1, 1.7);
+    win(x - .6, 1.4, z + 1.72, .8, .8);
+    box(x + .7, .8, z + 1.72, .4, .8, .04, plasterMat(0x3a2519));
+    chimney(x - 1.2, 3.0, z - .6);
+  }
+  box(-6.5, .3, 44, 4.2, .12, 1, M.wood);
+  box(-3, .15, 42.8, .15, .5, .15, M.trunk);
+  box(-9, .15, 45.2, .15, .5, .15, M.trunk);
+  districts.push({ name: 'The Bay Area', x: -14, z: 41, y: 1, r: 24 });
+}
+/* the moored boat */
+const boat = new THREE.Group();
+{
+  const hull = new THREE.Mesh(new THREE.BoxGeometry(3, .6, 1.4), M.wood);
+  const mast = new THREE.Mesh(new THREE.BoxGeometry(.12, 1.6, .12), M.trunk);
+  mast.position.y = 1;
+  boat.add(hull, mast);
+  boat.position.set(1.5, .1, 45.5);
+  world.add(boat);
+}
+
+/* Research Row */
+{
+  let rx = 14;
+  for (const h of [2.6, 3.2, 2.4]) {
+    box(rx, 1.8 + h / 2, -26, 1.6, h / 2, 1.7, plasterMat(0x46536b));
+    box(rx, 1.8 + h + .12, -26, 1.8, .12, 1.9, plasterMat(0x2c3442));
+    box(rx + .9, 1.8 + h + .9, -26.6, .05, .8, .05, M.stone);
+    win(rx - .4, 1.8 + h * .5, -24.28, 1.3, h * .45, 0, 0x9fe8c8, 0x5a6a78);
+    rx += 4.2;
+  }
+  districts.push({ name: 'Research Row', x: 18, z: -26, y: 3, r: 22 });
+}
+
+/* Sunshine District cottages */
+for (const [x, z] of [[-44, 14], [-38, 20]]) {
+  box(x, 1.1, z, 1.8, 1.1, 1.6, plasterMat(0xd9c27a));
+  gable(x, 2.16, z, 1.8, 1.0, 1.6, 0x8f5642);
+  win(x - .5, 1.3, z + 1.62, .7, .7);
+  box(x + .6, .75, z + 1.62, .35, .75, .04, plasterMat(0x5c4030));
+  chimney(x + 1.1, 2.8, z - .5);
+}
+
+/* The Islands */
+{
+  slab(40, 1, -40, 2.6, 1, 2.2);
+  slab(50, 1, -31, 1.7, .95, 1.5);
+  box(40, 2.75, -40, 1.1, .7, 1, plasterMat(0x7a5a8e));
+  gable(40, 3.43, -40, 1.1, .8, 1, 0x3a3448);
+  win(39.7, 2.7, -38.98, .6, .6, 0, 0xc9a8e8, 0x5a4a6e);
+  box(33, 2.0, -36.5, 3.4, .09, .5, M.wood, .5);
+  districts.push({ name: 'The Islands', x: 42, z: -37, y: 2, r: 26 });
+}
+
+/* ---------------- the residences (Aug 12 2026) ----------------
+   the five citizens' first homes — same neighborhoods as the Human
+   Perspective map, roof dyed to each citizen's color, plate overhead */
+function plaque(text, x, y, z, colorHex) {
+  const c = document.createElement('canvas'); c.width = 512; c.height = 96;
+  const g2 = c.getContext('2d');
+  g2.fillStyle = 'rgba(10,13,19,0.66)';
+  g2.fillRect(64, 14, 384, 68);
+  g2.font = 'bold 42px "Courier New", monospace';
+  g2.textAlign = 'center'; g2.textBaseline = 'middle';
+  g2.fillStyle = '#' + colorHex.toString(16).padStart(6, '0');
+  g2.fillText(text, 256, 50);
+  const sp = new THREE.Sprite(new THREE.SpriteMaterial({ map: new THREE.CanvasTexture(c), transparent: true }));
+  sp.scale.set(7.4, 1.4, 1);
+  sp.position.set(x, y, z);
+  world.add(sp);
+}
+function residence(label, x, z, roofC, gBase) {
+  const g = gBase !== undefined ? gBase : terrainH(x, z);
+  box(x, g + 1.25, z, 2.2, 1.25, 1.9, plasterMat(0xe8dcc0));
+  gable(x, g + 2.48, z, 2.2, 1.5, 1.9, roofC);
+  box(x + .8, g + .85, z + 1.92, .45, .85, .05, plasterMat(0x3a2519));
+  win(x - .7, g + 1.5, z + 1.93, .9, .9);
+  win(x + 2.22, g + 1.4, z - .3, .8, .8, Math.PI / 2);
+  chimney(x - 1.3, g + 3.1, z - .6);
+  plaque(label + "'S PLACE", x, g + 5.1, z, roofC);
+}
+residence('REED',  -21, 33, 0xe05a6e);            /* the Bay */
+residence('VALE',   10, -32, 0x4fb4e6);           /* Research Row plateau */
+residence('FLINT',  33, 36, 0xf08c3c);            /* Iron District */
+residence('LUMEN', -46, 8, 0xe6c860);             /* Sunshine meadow */
+slab(48, 1, -28, 2.6, 1, 2.3);                    /* Dusk's own islet */
+residence('DUSK',   48, -28, 0x9a7ae0, 2);        /* the Islands */
+
+/* bridges */
+box(0, .75, 8, 6.4, .16, 1.6, M.stone, 0, false);
+box(-5.4, .35, 8, 1, .55, 1.4, M.stone);
+box(5.4, .35, 8, 1, .55, 1.4, M.stone);
+box(0, 2.32, -32, 4.6, .09, .7, M.wood, 0, false);
+
+/* lamps — plaza, market, bridge, ward get real light */
+lamp(8, 10, true); lamp(16, 11, true); lamp(-8, 10); lamp(-20, 8);
+lamp(-30, -6); lamp(6, -14); lamp(-12, -30, true); lamp(26, 18, true);
+
+/* ---------------- sky, sun, fog ---------------- */
+const SKYS = {
+  nightT: [10, 14, 28], nightB: [29, 36, 56], dayT: [126, 195, 232], dayB: [217, 235, 244],
+  dawnT: [201, 143, 110], dawnB: [240, 203, 160], duskT: [122, 90, 122], duskB: [214, 140, 120],
+};
+const mixc = (a, b, u) => a.map((v, i) => v + (b[i] - v) * u);
+function skyStops(t) {
+  const pick = (k1, k2, u) => [mixc(SKYS[k1 + 'T'], SKYS[k2 + 'T'], u), mixc(SKYS[k1 + 'B'], SKYS[k2 + 'B'], u)];
+  if (t < .20) return pick('night', 'night', 0);
+  if (t < .30) return pick('night', 'dawn', (t - .20) / .10);
+  if (t < .40) return pick('dawn', 'day', (t - .30) / .10);
+  if (t < .70) return pick('day', 'day', 0);
+  if (t < .80) return pick('day', 'dusk', (t - .70) / .10);
+  if (t < .90) return pick('dusk', 'night', (t - .80) / .10);
+  return pick('night', 'night', 0);
+}
+function nightness(t) {
+  if (t > .35 && t < .75) return 0;
+  if (t <= .25 || t >= .85) return 1;
+  if (t <= .35) return 1 - (t - .25) / .10;
+  return (t - .75) / .10;
+}
+const skyCanvas = document.createElement('canvas');
+skyCanvas.width = 2; skyCanvas.height = 256;
+const skyCtx = skyCanvas.getContext('2d');
+const skyTex = new THREE.CanvasTexture(skyCanvas);
+skyTex.colorSpace = THREE.SRGBColorSpace;
+scene.background = skyTex;
+scene.fog = new THREE.Fog(0x9db8c8, 120, 420);
+
+const hemi = new THREE.HemisphereLight(0xcfe4f0, 0x5a6a4a, .55);
+scene.add(hemi);
+const sun = new THREE.DirectionalLight(0xfff2dc, 1.1);
+sun.castShadow = true;
+sun.shadow.mapSize.set(2048, 2048);
+sun.shadow.camera.left = -85; sun.shadow.camera.right = 85;
+sun.shadow.camera.top = 85; sun.shadow.camera.bottom = -85;
+sun.shadow.camera.far = 400;
+sun.shadow.bias = -0.0015;
+scene.add(sun, sun.target);
+
+/* stars */
+const starGeo = new THREE.BufferGeometry();
+{
+  const pos = [];
+  for (let i = 0; i < 500; i++) {
+    const a = Math.random() * Math.PI * 2, e = .12 + Math.random() * 1.3;
+    pos.push(Math.cos(a) * Math.cos(e) * 600, Math.sin(e) * 600, Math.sin(a) * Math.cos(e) * 600);
+  }
+  starGeo.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+}
+const starMat = new THREE.PointsMaterial({ color: 0xdfe8ff, size: 1.6, sizeAttenuation: false, transparent: true, opacity: 0, fog: false });
+scene.add(new THREE.Points(starGeo, starMat));
+
+/* ---------------- the moon (Aug 26 2026 — a city with a Moon Court keeps a moon) ----------------
+   A crescent riding the arc opposite the sun, with a breath of silver light
+   so the night city has more than lamplight to see by. */
+const moonMat = (() => {
+  const c = document.createElement('canvas'); c.width = c.height = 256;
+  const g = c.getContext('2d');
+  const disc = g.createRadialGradient(128, 128, 30, 128, 128, 108);
+  disc.addColorStop(0, 'rgba(240,236,252,1)');
+  disc.addColorStop(.75, 'rgba(222,216,244,1)');
+  disc.addColorStop(1, 'rgba(200,194,232,0)');
+  g.fillStyle = disc;
+  g.beginPath(); g.arc(128, 128, 108, 0, Math.PI * 2); g.fill();
+  g.globalCompositeOperation = 'destination-out';           /* carve the crescent */
+  g.beginPath(); g.arc(170, 108, 88, 0, Math.PI * 2); g.fill();
+  return new THREE.SpriteMaterial({ map: new THREE.CanvasTexture(c), transparent: true, opacity: 0, fog: false, depthWrite: false });
+})();
+const moon = new THREE.Sprite(moonMat);
+moon.scale.set(24, 24, 1);
+scene.add(moon);
+const moonLight = new THREE.DirectionalLight(0xbfd0ff, 0);
+scene.add(moonLight);
+
+/* ---------------- small life (Aug 26 2026) ----------------
+   fireflies after dark, dragonflies over the water by day,
+   and real Columbia weather falling on the city. */
+
+/* fireflies — warm sparks around the lamps and the Great Tree */
+const FF_HOMES = [[-34,-18],[14,9],[-33,6],[-14,41],[48,13],[21,14]];
+const ffBase = [];
+const ffGeo = new THREE.BufferGeometry();
+{
+  const pos = [];
+  for (const [cx, cz] of FF_HOMES) for (let i = 0; i < 10; i++) {
+    const x = cx + (Math.random() - .5) * 14, z = cz + (Math.random() - .5) * 14;
+    const y = terrainH(x, z) + 1 + Math.random() * 2.5;
+    ffBase.push({ x, y, z, ph: Math.random() * Math.PI * 2, sp: .3 + Math.random() * .7 });
+    pos.push(x, y, z);
+  }
+  ffGeo.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+}
+const ffMat = new THREE.PointsMaterial({ color: 0xffe8a0, size: .35, transparent: true, opacity: 0, blending: THREE.AdditiveBlending, depthWrite: false });
+world.add(new THREE.Points(ffGeo, ffMat));
+
+/* dragonflies — quick teal darts skimming the water while the sun is up */
+const dragonflies = [];
+{
+  const WATERS_XZ = [[0, 15], [0, 34], [-6, 44], [42, -37], [-33, 6]];
+  for (let i = 0; i < 12; i++) {
+    const [cx, cz] = WATERS_XZ[i % WATERS_XZ.length];
+    const g = new THREE.Group();
+    const bodyMat = new THREE.MeshBasicMaterial({ color: 0x4fd8c8, transparent: true, opacity: .9 });
+    const wingMat = new THREE.MeshBasicMaterial({ color: 0xd8f0f4, transparent: true, opacity: .5, side: THREE.DoubleSide });
+    const body = new THREE.Mesh(new THREE.BoxGeometry(.5, .04, .05), bodyMat);
+    const w1 = new THREE.Mesh(new THREE.PlaneGeometry(.5, .12), wingMat);
+    const w2 = new THREE.Mesh(new THREE.PlaneGeometry(.5, .12), wingMat);
+    w1.rotation.x = w2.rotation.x = -Math.PI / 2;
+    w1.rotation.z = .6; w2.rotation.z = -.6;
+    w1.position.x = w2.position.x = .05;
+    g.add(body, w1, w2);
+    g.userData = { cx, cz, ph: Math.random() * Math.PI * 2, sp: .5 + Math.random() * .6, r: 3 + Math.random() * 5, w1, w2, mats: [bodyMat, wingMat] };
+    world.add(g);
+    dragonflies.push(g);
+  }
+}
+
+/* citizen-made changes — what the citizens planted and posted, from the
+   action loop. Saplings grow with age; nobody told them to plant anything. */
+fetch('world-changes.json?t=' + Date.now()).then(r => r.json()).then(d => {
+  for (const c of (d.changes || [])) {
+    if (c.x3 == null) continue;
+    const g = terrainH(c.x3, c.z3);
+    if (c.verb === 'sign') {
+      box(c.x3, g + .55, c.z3, .06, .55, .06, M.trunk);
+      box(c.x3, g + .95, c.z3, .5, .28, .04, plasterMat(0xb08d62));
+    } else if (c.kind === 'flowers') {
+      for (let i = 0; i < 3; i++) {
+        const f = new THREE.Mesh(new THREE.IcosahedronGeometry(.13, 0),
+          new THREE.MeshLambertMaterial({ color: [0xe87ba8, 0xf0f0d8, 0xe6c860][i] }));
+        f.position.set(c.x3 + (i - 1) * .35, g + .15, c.z3 + (i % 2) * .3);
+        world.add(f);
+      }
+    } else {
+      tree(c.x3, c.z3, .45 + Math.min(c.age_days ?? 0, 30) / 30 * .5);
+    }
+  }
+}).catch(() => {});
+
+/* real weather — Columbia SC, checked every 10 minutes; fails silent */
+const RAIN_N = 900;
+const rainGeo = new THREE.BufferGeometry();
+{
+  const pos = [];
+  for (let i = 0; i < RAIN_N; i++)
+    pos.push(-70 + Math.random() * 140, Math.random() * 45, -55 + Math.random() * 105);
+  rainGeo.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+}
+const rainMat = new THREE.PointsMaterial({ color: 0x9fb8d0, size: .12, transparent: true, opacity: 0, depthWrite: false });
+const rainPts = new THREE.Points(rainGeo, rainMat);
+rainPts.visible = false;
+world.add(rainPts);
+let weather = { wet: false, snow: false };
+function checkWeather() {
+  fetch('https://api.open-meteo.com/v1/forecast?latitude=34.0007&longitude=-81.0348&current=precipitation,weather_code')
+    .then(r => r.json()).then(d => {
+      const c = d.current || {};
+      const code = c.weather_code | 0;
+      const snow = (code >= 71 && code <= 77) || code === 85 || code === 86;
+      const wet = snow || (c.precipitation || 0) > 0 || (code >= 51 && code <= 67) || (code >= 80 && code <= 82) || code >= 95;
+      weather = { wet, snow };
+      rainMat.color.set(snow ? 0xf0f4fa : 0x9fb8d0);
+      rainMat.size = snow ? .3 : .12;
+    }).catch(() => {});
+}
+checkWeather();
+setInterval(checkWeather, 10 * 60 * 1000);
+
+/* ---------------- citizens ---------------- */
+const POIS = [
+  { x: -16, z: -40, n: 'First Morning House' },
+  { x: -34, z: -12, n: 'the Great Tree' },
+  { x: 18, z: -23, n: 'Research Row' },
+  { x: 14, z: 5, n: 'the Post Office' },
+  { x: 21, z: 9, n: 'Fountain Plaza' },
+  { x: 21, z: 13, n: 'Market Lane' },
+  { x: -31, z: 9, n: 'the Lido' },
+  { x: -17, z: 40, n: 'the Bay' },
+  { x: 29, z: 27, n: 'the Windmill' },
+  { x: -41, z: 16, n: 'Sunshine District' },
+  { x: 5, z: -9, n: 'the falls overlook' },
+];
+const citizens = [];
+const citizenGroup = new THREE.Group();
+world.add(citizenGroup);
+
+function makeCitizenMesh(hue) {
+  const g = new THREE.Group();
+  const body = new THREE.Mesh(new THREE.CapsuleGeometry(.28, .5, 3, 8),
+    new THREE.MeshLambertMaterial({ color: hue }));
+  body.position.y = .62; body.castShadow = true;
+  const head = new THREE.Mesh(new THREE.SphereGeometry(.2, 10, 8),
+    new THREE.MeshLambertMaterial({ color: 0xe8c39a }));
+  head.position.y = 1.28; head.castShadow = true;
+  const hit = new THREE.Mesh(new THREE.SphereGeometry(1.0, 6, 5),
+    new THREE.MeshBasicMaterial({ visible: false }));
+  hit.position.y = .8;
+  g.add(body, head, hit);
+  return g;
+}
+function planRoute(c, tx, tz) {
+  c.route = [];
+  if ((c.x < 0) !== (tx < 0) && Math.abs(c.x) + Math.abs(tx) > 2) {
+    const avg = (c.z + tz) / 2;
+    if (avg < -12) c.route.push({ x: 0, z: -32 });
+    else c.route.push({ x: 0, z: 8 });
+  }
+  c.route.push({ x: tx, z: tz });
+}
+function retarget(c) {
+  const p = POIS[(Math.random() * POIS.length) | 0];
+  c.goal = GOALS[(Math.random() * GOALS.length) | 0](p.n);
+  planRoute(c, p.x + (Math.random() - .5) * 3, p.z + (Math.random() - .5) * 3);
+}
+function makeCitizen(i) {
+  const c = {
+    name: NAMES[i % NAMES.length],
+    x: (Math.random() - .5) * 60, z: (Math.random() - .5) * 70,
+    goal: '', spd: 1.1 + Math.random() * 1.2, ph: Math.random() * 6.28,
+    pause: 0, route: [],
+    mesh: makeCitizenMesh(AGENT_HUES[i % AGENT_HUES.length]),
+  };
+  if (Math.abs(c.x) < 8 && c.z > -60) c.x += c.x < 0 ? -10 : 10;
+  citizenGroup.add(c.mesh);
+  retarget(c);
+  return c;
+}
+function setCitizens(n) {
+  state.citizens = Math.max(0, Math.min(MAX_CITIZENS, n | 0));
+  while (citizens.length < state.citizens) citizens.push(makeCitizen(citizens.length));
+  while (citizens.length > state.citizens) citizenGroup.remove(citizens.pop().mesh);
+  document.getElementById('citN').textContent = citizens.length;
+}
+window.setCitizens = setCitizens;
+
+/* ---------------- births: a lantern rises to the Great Tree ---------------- */
+const births = [];
+function birth() {
+  const m = new THREE.Mesh(new THREE.SphereGeometry(.3, 10, 8),
+    new THREE.MeshBasicMaterial({ color: 0xffd9a0, transparent: true }));
+  const l = new THREE.PointLight(0xffc878, 2.2, 22, 1.6);
+  m.add(l); m.position.copy(WARD);
+  world.add(m);
+  births.push({ m, t: 0 });
+}
+
+/* ---------------- CityLink ---------------- */
+window.CityLink = {
+  timer: null,
+  birth,
+  connect(opts = {}, ms = 15000) {
+    const url = opts.traffic || '/city/traffic';
+    const poll = () => {
+      fetch(url).then(r => r.json()).then(d => {
+        state.linked = true;
+        setCitizens(d.traffic ?? d.count ?? d.agents ?? state.citizens);
+        ui();
+      }).catch(() => { state.linked = false; ui(); });
+    };
+    poll();
+    clearInterval(this.timer);
+    this.timer = setInterval(poll, ms);
+    return () => clearInterval(this.timer);
+  },
+};
+
+
+/* ---------------- street level (Phase 1 — the Mayor's vision) ---------------- */
+const walk = { on: false, pending: false, yaw: 0, pitch: 0, keys: {}, joyM: null, joyL: null };
+const EYE = 1.55, WALK_SPEED = 5.2, RUN_MULT = 1.8;
+let colliders = null, decks = null, waterBoxes = null;
+const SPAWN = { x: 21, z: 26 };   /* Market Lane, south row — where the shop will stand */
+
+function buildColliders() {
+  colliders = []; decks = []; waterBoxes = [];
+  world.updateMatrixWorld(true);
+  world.traverse(m => {
+    if (!m.isMesh || !m.geometry) return;
+    const t = m.geometry.type || '';
+    if (!t.includes('Box')) {
+      return;
+    }
+    const b = new THREE.Box3().setFromObject(m);
+    const hgt = b.max.y - b.min.y;
+    if (waters.includes(m)) { waterBoxes.push(b); return; }
+    if (hgt >= 1.6) colliders.push(b);
+    else if (b.min.y > 0.25 && hgt < 1.2) decks.push(b);   /* bridges, low platforms */
+  });
+}
+function groundAt(x, z) {
+  let g = terrainH(x, z);
+  if (decks) for (const d of decks)
+    if (x > d.min.x - .2 && x < d.max.x + .2 && z > d.min.z - .2 && z < d.max.z + .2)
+      g = Math.max(g, d.max.y);
+  return g;
+}
+function blockedAt(x, z, g) {
+  if (colliders) for (const b of colliders) {
+    if (x > b.min.x - .35 && x < b.max.x + .35 && z > b.min.z - .35 && z < b.max.z + .35) {
+      if (b.max.y - g > 1.1 && b.min.y - g < 1.3) return true;   /* body-band obstacle */
+    }
+  }
+  if (waterBoxes) for (const w of waterBoxes) {
+    if (x > w.min.x && x < w.max.x && z > w.min.z && z < w.max.z) {
+      let onDeck = false;
+      for (const d of decks)
+        if (x > d.min.x - .2 && x < d.max.x + .2 && z > d.min.z - .2 && z < d.max.z + .2) { onDeck = true; break; }
+      if (!onDeck && terrainH(x, z) < w.max.y + .1) return true;   /* no swimming */
+    }
+  }
+  return false;
+}
+function enterStreet() {
+  if (!colliders) buildColliders();
+  state.tour = false; $('btnTour').textContent = 'Tour';
+  const gy = groundAt(SPAWN.x, SPAWN.z);
+  walk.pending = true;
+  tween = {
+    t: 0, dur: 2.6,
+    fromT: controls.target.clone(), toT: new THREE.Vector3(SPAWN.x, gy + EYE - .1, SPAWN.z - 4),
+    fromP: camera.position.clone(), toP: new THREE.Vector3(SPAWN.x, gy + EYE, SPAWN.z),
+  };
+  $('btnWalk').textContent = '↑ Overview';
+  showDistrictLabel('Street Level — walk with WASD / left thumb · look by dragging');
+}
+function exitStreet() {
+  walk.on = false; walk.pending = false;
+  joyHide();
+  controls.enabled = true;
+  tween = {
+    t: 0, dur: 2.6,
+    fromT: controls.target.clone(), toT: new THREE.Vector3(0, 0, 2),
+    fromP: camera.position.clone(), toP: new THREE.Vector3(60, 78, 105),
+  };
+  $('btnWalk').textContent = '⟶ Walk';
+}
+function showDistrictLabel(txt) {
+  const el = document.getElementById('district');
+  if (!el) return;
+  el.textContent = txt; el.style.opacity = 1;
+  clearTimeout(el._t); el._t = setTimeout(() => el.style.opacity = 0, 6000);
+}
+$('btnWalk').onclick = () => (walk.on || walk.pending) ? exitStreet() : enterStreet();
+
+/* input — keys */
+addEventListener('keydown', e => {
+  if (e.key === 'Escape' && (walk.on || walk.pending)) exitStreet();
+  walk.keys[e.key.toLowerCase()] = true;
+});
+addEventListener('keyup', e => walk.keys[e.key.toLowerCase()] = false);
+
+/* input — drag to look (mouse or right-half touch), left-half touch joystick */
+let lookDrag = null;
+const cnv = renderer.domElement;
+cnv.addEventListener('pointerdown', e => {
+  if (!walk.on) return;
+  if (e.pointerType === 'touch' && e.clientX < innerWidth * .45) {
+    walk.joyL = { id: e.pointerId, x0: e.clientX, y0: e.clientY }; joyShow(e.clientX, e.clientY);
+  } else lookDrag = { id: e.pointerId, x: e.clientX, y: e.clientY };
+});
+addEventListener('pointermove', e => {
+  if (!walk.on) return;
+  if (walk.joyL && e.pointerId === walk.joyL.id) {
+    const dx = e.clientX - walk.joyL.x0, dy = e.clientY - walk.joyL.y0;
+    const m = Math.min(1, Math.hypot(dx, dy) / 60);
+    const a = Math.atan2(dx, -dy);
+    walk.joyM = { f: -Math.cos(a) * m * -1, s: Math.sin(a) * m };  /* forward, strafe */
+    joyMove(dx, dy);
+  } else if (lookDrag && e.pointerId === lookDrag.id) {
+    walk.yaw -= (e.clientX - lookDrag.x) * .0042;
+    walk.pitch = Math.max(-1.2, Math.min(1.2, walk.pitch - (e.clientY - lookDrag.y) * .0035));
+    lookDrag.x = e.clientX; lookDrag.y = e.clientY;
+  }
+});
+addEventListener('pointerup', e => {
+  if (walk.joyL && e.pointerId === walk.joyL.id) { walk.joyL = null; walk.joyM = null; joyHide(); }
+  if (lookDrag && e.pointerId === lookDrag.id) lookDrag = null;
+});
+
+/* tiny visual joystick */
+let joyEl = null, joyKnob = null;
+function joyShow(x, y) {
+  if (!joyEl) {
+    joyEl = document.createElement('div'); joyKnob = document.createElement('div');
+    joyEl.style.cssText = 'position:fixed;width:96px;height:96px;border:2px solid rgba(216,220,230,.4);border-radius:50%;pointer-events:none;z-index:40;';
+    joyKnob.style.cssText = 'position:absolute;left:50%;top:50%;width:36px;height:36px;margin:-18px 0 0 -18px;border-radius:50%;background:rgba(127,224,178,.5);';
+    joyEl.appendChild(joyKnob); document.body.appendChild(joyEl);
+  }
+  joyEl.style.display = 'block';
+  joyEl.style.left = (x - 48) + 'px'; joyEl.style.top = (y - 48) + 'px';
+}
+function joyMove(dx, dy) {
+  if (!joyKnob) return;
+  const m = Math.min(40, Math.hypot(dx, dy)), a = Math.atan2(dy, dx);
+  joyKnob.style.transform = `translate(${Math.cos(a) * m}px, ${Math.sin(a) * m}px)`;
+}
+function joyHide() { if (joyEl) { joyEl.style.display = 'none'; joyKnob.style.transform = ''; } }
+
+let lastDistrict = '';
+function walkUpdate(dt) {
+  /* first frame after the entrance tween: seize the camera */
+  if (walk.pending) {
+    walk.pending = false; walk.on = true;
+    controls.enabled = false;
+    const e = new THREE.Euler().setFromQuaternion(camera.quaternion, 'YXZ');
+    walk.yaw = e.y; walk.pitch = e.x;
+    showDistrictLabel('Market Lane');
+  }
+  let f = 0, s = 0;
+  const k = walk.keys;
+  if (k['w'] || k['arrowup']) f += 1;
+  if (k['s'] || k['arrowdown']) f -= 1;
+  if (k['a'] || k['arrowleft']) s -= 1;
+  if (k['d'] || k['arrowright']) s += 1;
+  if (walk.joyM) { f += walk.joyM.f; s += walk.joyM.s; }
+  const spd = WALK_SPEED * (k['shift'] ? RUN_MULT : 1);
+  const sin = Math.sin(walk.yaw), cos = Math.cos(walk.yaw);
+  let nx = camera.position.x + (-sin * f + cos * s) * spd * dt;
+  let nz = camera.position.z + (-cos * f - sin * s) * spd * dt;
+  const cg = groundAt(camera.position.x, camera.position.z);
+  /* slide along obstacles: try full, then each axis */
+  if (!blockedAt(nx, nz, cg)) { camera.position.x = nx; camera.position.z = nz; }
+  else if (!blockedAt(nx, camera.position.z, cg)) camera.position.x = nx;
+  else if (!blockedAt(camera.position.x, nz, cg)) camera.position.z = nz;
+  const g = groundAt(camera.position.x, camera.position.z);
+  camera.position.y += ((g + EYE) - camera.position.y) * Math.min(1, dt * 10);
+  camera.quaternion.setFromEuler(new THREE.Euler(walk.pitch, walk.yaw, 0, 'YXZ'));
+  /* district HUD */
+  let name = '';
+  for (const d of districts) {
+    const dx = camera.position.x - d.x, dz = camera.position.z - d.z;
+    if (dx * dx + dz * dz < d.r * d.r * .55) { name = d.name; break; }
+  }
+  if (name && name !== lastDistrict) { lastDistrict = name; showDistrictLabel(name); }
+}
+
+/* ---------------- tour ---------------- */
+let tourIdx = -1, tourHold = 0, tween = null;
+function flyTo(d, hold = 7) {
+  const az = Math.random() * Math.PI * 2;
+  tween = {
+    t: 0, dur: 2.4,
+    fromT: controls.target.clone(),
+    toT: new THREE.Vector3(d.x, d.y, d.z),
+    fromP: camera.position.clone(),
+    toP: new THREE.Vector3(d.x + Math.sin(az) * d.r * .85, d.y + d.r * .62, d.z + Math.cos(az) * d.r * .85),
+  };
+  tourHold = hold;
+  const el = document.getElementById('district');
+  el.textContent = d.name;
+  el.style.opacity = 1;
+  clearTimeout(el._t);
+  el._t = setTimeout(() => el.style.opacity = 0, hold * 1000);
+}
+const OVERVIEW = { name: 'Marla City', x: 0, z: 2, y: 0, r: 150 };
+
+/* ---------------- pointer: hover names a walker ---------------- */
+const ray = new THREE.Raycaster();
+const ptr = new THREE.Vector2();
+const tip = document.getElementById('tip');
+let hoverC = null;
+function pickCitizen(e) {
+  ptr.x = (e.clientX / innerWidth) * 2 - 1;
+  ptr.y = -(e.clientY / innerHeight) * 2 + 1;
+  ray.setFromCamera(ptr, camera);
+  const hits = ray.intersectObjects(citizenGroup.children, true);
+  if (!hits.length) return null;
+  let g = hits[0].object;
+  while (g.parent && g.parent !== citizenGroup) g = g.parent;
+  return citizens.find(c => c.mesh === g) || null;
+}
+function showTip(c, x, y, hold) {
+  tip.style.display = 'block';
+  tip.style.left = Math.min(innerWidth - 190, x + 14) + 'px';
+  tip.style.top = (y - 10) + 'px';
+  tip.querySelector('.nm').textContent = c.name;
+  tip.querySelector('.gl').textContent = c.goal;
+  clearTimeout(tip._t);
+  if (hold) tip._t = setTimeout(() => tip.style.display = 'none', hold);
+}
+canvas.addEventListener('pointermove', e => {
+  const c = pickCitizen(e);
+  canvas.style.cursor = c ? 'pointer' : '';
+  if (c) { showTip(c, e.clientX, e.clientY, 0); hoverC = c; }
+  else if (hoverC) { tip.style.display = 'none'; hoverC = null; }
+});
+canvas.addEventListener('click', e => {
+  const c = pickCitizen(e);
+  if (c) { showTip(c, e.clientX, e.clientY, 2600); return; }
+  tip.style.display = 'none';
+  /* click a district to visit */
+  ray.setFromCamera(ptr, camera);
+  const ground = ray.intersectObjects(world.children, false).find(h => h.point);
+  if (ground) {
+    let best = null, bd = 1e9;
+    for (const d of districts) {
+      const dd = Math.hypot(ground.point.x - d.x, ground.point.z - d.z);
+      if (dd < 14 && dd < bd) { best = d; bd = dd; }
+    }
+    if (best) { state.tour = false; flyTo(best, 8); ui(); }
+  }
+});
+
+/* ---------------- HUD ---------------- */
+const $ = id => document.getElementById(id);
+function ui() {
+  $('linkDot').classList.toggle('live', state.linked);
+  $('linkState')?.remove;
+  $('btnClock').textContent = state.clockLive ? 'Clock: Live' : 'Clock: Demo';
+  $('btnTour').textContent = state.tour ? 'Tour: On' : 'Tour';
+}
+$('btnCit').onclick = () => setCitizens(state.citizens + 1);
+$('btnTour').onclick = () => {
+  state.tour = !state.tour;
+  if (state.tour) { tourIdx = -1; tourHold = 0; }
+  else flyTo(OVERVIEW, 3);
+  ui();
+};
+$('btnClock').onclick = () => { state.clockLive = !state.clockLive; ui(); };
+ui();
+setCitizens(state.citizens);
+
+/* district picker — one tap flies you there (built for phones) */
+districts.forEach((d, i) => {
+  const o = document.createElement('option');
+  o.value = i; o.textContent = d.name;
+  $('selDist').appendChild(o);
+});
+$('selDist').onchange = () => {
+  const v = $('selDist').value;
+  if (v === '') return;
+  state.tour = false;
+  flyTo(v === 'ov' ? OVERVIEW : districts[+v], 8);
+  ui();
+  $('selDist').value = '';
+};
+
+/* ---------------- animate ---------------- */
+const clock = new THREE.Clock();
+function animate() {
+  const dt = Math.min(.05, clock.getDelta());
+  const t = clock.elapsedTime;
+
+  if (state.clockLive) {
+    const now = new Date();
+    state.dayT = (now.getHours() * 3600 + now.getMinutes() * 60 + now.getSeconds()) / 86400;
+  } else state.dayT = (state.dayT + dt / 240) % 1;   /* demo: a four-minute day, slow enough to savor dusk */
+  const nt = nightness(state.dayT);
+
+  /* sky gradient + fog */
+  const [top, bot] = skyStops(state.dayT);
+  const grad = skyCtx.createLinearGradient(0, 0, 0, 256);
+  grad.addColorStop(0, `rgb(${top.map(v => v | 0).join(',')})`);
+  grad.addColorStop(1, `rgb(${bot.map(v => v | 0).join(',')})`);
+  skyCtx.fillStyle = grad;
+  skyCtx.fillRect(0, 0, 2, 256);
+  skyTex.needsUpdate = true;
+  scene.fog.color.setRGB(bot[0] / 255, bot[1] / 255, bot[2] / 255);
+  starMat.opacity = nt * .9;
+
+  /* sun path */
+  const sa = (state.dayT - .25) * Math.PI * 2;
+  const sunI = Math.max(0, Math.sin(sa));
+  sun.position.set(Math.cos(sa) * 120, Math.max(8, Math.sin(sa) * 140), 60);
+  sun.intensity = .15 + sunI * 1.15;
+  sun.color.setHSL(.09, .5, .62 + sunI * .3);
+  hemi.intensity = .18 + (1 - nt) * .42;
+  renderer.toneMappingExposure = .92 + (1 - nt) * .18;
+
+  /* moon path — opposite the sun, fading in with the stars */
+  const ma = sa + Math.PI;
+  moon.position.set(Math.cos(ma) * 120, Math.max(6, Math.sin(ma) * 130), 40);
+  moonMat.opacity = nt * .95;
+  moonLight.position.copy(moon.position);
+  moonLight.intensity = nt * .28;
+
+  /* fireflies drift after dark */
+  ffMat.opacity = nt * .9;
+  if (nt > 0) {
+    const fp = ffGeo.attributes.position.array;
+    for (let i = 0; i < ffBase.length; i++) {
+      const b = ffBase[i];
+      fp[i * 3]     = b.x + Math.sin(t * b.sp + b.ph) * 1.6;
+      fp[i * 3 + 1] = b.y + Math.sin(t * b.sp * 1.7 + b.ph * 2) * .5;
+      fp[i * 3 + 2] = b.z + Math.cos(t * b.sp * .8 + b.ph) * 1.6;
+    }
+    ffGeo.attributes.position.needsUpdate = true;
+  }
+
+  /* dragonflies dart over the water by day */
+  for (const df of dragonflies) {
+    const u = df.userData;
+    const day = 1 - nt;
+    for (const m of u.mats) m.opacity = day * (m === u.mats[0] ? .9 : .5);
+    df.visible = day > .05;
+    if (!df.visible) continue;
+    const px = u.cx + Math.sin(t * u.sp + u.ph) * u.r + Math.sin(t * u.sp * 2.7 + u.ph) * 1.2;
+    const pz = u.cz + Math.cos(t * u.sp * .8 + u.ph) * u.r;
+    const py = .8 + Math.abs(Math.sin(t * u.sp * 1.3 + u.ph)) * 1.6;
+    df.rotation.y = Math.atan2(px - df.position.x, pz - df.position.z);
+    df.position.set(px, py, pz);
+    const flut = Math.sin(t * 40 + u.ph) * .5;
+    u.w1.rotation.z = .6 + flut; u.w2.rotation.z = -.6 - flut;
+  }
+
+  /* rain or snow when it falls on the real Columbia */
+  rainPts.visible = weather.wet;
+  rainMat.opacity = weather.wet ? .55 : 0;
+  if (rainPts.visible) {
+    const rp = rainGeo.attributes.position.array;
+    const fall = weather.snow ? 3.5 : 34;
+    for (let i = 0; i < RAIN_N; i++) {
+      rp[i * 3 + 1] -= fall * dt;
+      if (weather.snow) rp[i * 3] += Math.sin(t + i) * .02;
+      if (rp[i * 3 + 1] < 0) rp[i * 3 + 1] = 40 + Math.random() * 5;
+    }
+    rainGeo.attributes.position.needsUpdate = true;
+  }
+
+  /* lamps breathe on at night; windows warm up with them */
+  for (const b of lampGlows) b.material.color.setHSL(.11, 1, .45 + nt * .35);
+  for (const l of lampLights) l.intensity = nt * 2.4;
+  for (const w of windowGlows) w.mat.color.lerpColors(w.day, w.night, nt);
+
+  /* water drift + falls scroll */
+  for (const w of waters) w.material.map.offset.x = t * .008;
+  fallsTex.offset.y = -t * .9;
+  blades.rotation.z = t * .7;
+  boat.position.y = .1 + Math.sin(t * 1.1) * .07;
+  boat.rotation.z = Math.sin(t * .9) * .04;
+
+  /* tour */
+  if (state.tour && !tween) {
+    tourHold -= dt;
+    if (tourHold <= 0) {
+      tourIdx = (tourIdx + 1) % (districts.length + 1);
+      flyTo(tourIdx === districts.length ? OVERVIEW : districts[tourIdx], 6.5);
+    }
+  }
+  if (tween) {
+    tween.t += dt;
+    const u = Math.min(1, tween.t / tween.dur);
+    const s = u * u * (3 - 2 * u);
+    controls.target.lerpVectors(tween.fromT, tween.toT, s);
+    camera.position.lerpVectors(tween.fromP, tween.toP, s);
+    if (u >= 1) tween = null;
+  }
+  if ((walk.on || walk.pending) && !tween) walkUpdate(dt);
+  if (!walk.on) controls.update();
+
+  /* births rise from the ward to the tree */
+  for (let i = births.length - 1; i >= 0; i--) {
+    const b = births[i];
+    b.t += dt / 7;
+    if (b.t >= 1) { world.remove(b.m); births.splice(i, 1); continue; }
+    const e = b.t * b.t * (3 - 2 * b.t);
+    b.m.position.lerpVectors(WARD, TREE, e);
+    b.m.position.y += Math.sin(b.t * Math.PI) * 6;
+    b.m.material.opacity = Math.min(1, (1 - b.t) * 3);
+  }
+
+  /* citizens live their errands */
+  for (const c of citizens) {
+    if (c.pause > 0) {
+      c.pause -= dt;
+      if (c.pause <= 0) retarget(c);
+    } else if (c.route.length) {
+      const w = c.route[0];
+      const dx = w.x - c.x, dz = w.z - c.z;
+      const d = Math.hypot(dx, dz);
+      if (d < .6) {
+        c.route.shift();
+        if (!c.route.length) c.pause = 3 + Math.random() * 5;
+      } else {
+        c.x += dx / d * c.spd * dt;
+        c.z += dz / d * c.spd * dt;
+        c.mesh.rotation.y = Math.atan2(dx, dz);
+      }
+    } else retarget(c);
+    const bob = c.pause > 0 ? 0 : Math.abs(Math.sin(t * 6 * c.spd + c.ph)) * .08;
+    c.mesh.position.set(c.x, terrainH(c.x, c.z) + bob, c.z);
+  }
+
+  renderer.render(scene, camera);
+  requestAnimationFrame(animate);
+}
+animate();
+</script>
+<script>
+/* Postcard edition — snapshot of July 19, 2026. No live wire: the city keeps its own counsel. */
+addEventListener('load', () => setCitizens(7));
+</script>
+</body>
+</html>
