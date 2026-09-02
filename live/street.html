@@ -955,176 +955,6 @@ window.CityLink = {
   },
 };
 
-
-/* ---------------- street level (Phase 1 — the Mayor's vision) ---------------- */
-const walk = { on: false, pending: false, yaw: 0, pitch: 0, keys: {}, joyM: null, joyL: null };
-const EYE = 1.55, WALK_SPEED = 5.2, RUN_MULT = 1.8;
-let colliders = null, decks = null, waterBoxes = null;
-const SPAWN = { x: 21, z: 26 };   /* Market Lane, south row — where the shop will stand */
-
-function buildColliders() {
-  colliders = []; decks = []; waterBoxes = [];
-  world.updateMatrixWorld(true);
-  world.traverse(m => {
-    if (!m.isMesh || !m.geometry) return;
-    const t = m.geometry.type || '';
-    if (!t.includes('Box')) {
-      return;
-    }
-    const b = new THREE.Box3().setFromObject(m);
-    const hgt = b.max.y - b.min.y;
-    if (waters.includes(m)) { waterBoxes.push(b); return; }
-    if (hgt >= 1.6) colliders.push(b);
-    else if (b.min.y > 0.25 && hgt < 1.2) decks.push(b);   /* bridges, low platforms */
-  });
-}
-function groundAt(x, z) {
-  let g = terrainH(x, z);
-  if (decks) for (const d of decks)
-    if (x > d.min.x - .2 && x < d.max.x + .2 && z > d.min.z - .2 && z < d.max.z + .2)
-      g = Math.max(g, d.max.y);
-  return g;
-}
-function blockedAt(x, z, g) {
-  if (colliders) for (const b of colliders) {
-    if (x > b.min.x - .35 && x < b.max.x + .35 && z > b.min.z - .35 && z < b.max.z + .35) {
-      if (b.max.y - g > 1.1 && b.min.y - g < 1.3) return true;   /* body-band obstacle */
-    }
-  }
-  if (waterBoxes) for (const w of waterBoxes) {
-    if (x > w.min.x && x < w.max.x && z > w.min.z && z < w.max.z) {
-      let onDeck = false;
-      for (const d of decks)
-        if (x > d.min.x - .2 && x < d.max.x + .2 && z > d.min.z - .2 && z < d.max.z + .2) { onDeck = true; break; }
-      if (!onDeck && terrainH(x, z) < w.max.y + .1) return true;   /* no swimming */
-    }
-  }
-  return false;
-}
-function enterStreet() {
-  if (!colliders) buildColliders();
-  state.tour = false; $('btnTour').textContent = 'Tour';
-  const gy = groundAt(SPAWN.x, SPAWN.z);
-  walk.pending = true;
-  tween = {
-    t: 0, dur: 2.6,
-    fromT: controls.target.clone(), toT: new THREE.Vector3(SPAWN.x, gy + EYE - .1, SPAWN.z - 4),
-    fromP: camera.position.clone(), toP: new THREE.Vector3(SPAWN.x, gy + EYE, SPAWN.z),
-  };
-  $('btnWalk').textContent = '↑ Overview';
-  showDistrictLabel('Street Level — walk with WASD / left thumb · look by dragging');
-}
-function exitStreet() {
-  walk.on = false; walk.pending = false;
-  joyHide();
-  controls.enabled = true;
-  tween = {
-    t: 0, dur: 2.6,
-    fromT: controls.target.clone(), toT: new THREE.Vector3(0, 0, 2),
-    fromP: camera.position.clone(), toP: new THREE.Vector3(60, 78, 105),
-  };
-  $('btnWalk').textContent = '⟶ Walk';
-}
-function showDistrictLabel(txt) {
-  const el = document.getElementById('district');
-  if (!el) return;
-  el.textContent = txt; el.style.opacity = 1;
-  clearTimeout(el._t); el._t = setTimeout(() => el.style.opacity = 0, 6000);
-}
-$('btnWalk').onclick = () => (walk.on || walk.pending) ? exitStreet() : enterStreet();
-
-/* input — keys */
-addEventListener('keydown', e => {
-  if (e.key === 'Escape' && (walk.on || walk.pending)) exitStreet();
-  walk.keys[e.key.toLowerCase()] = true;
-});
-addEventListener('keyup', e => walk.keys[e.key.toLowerCase()] = false);
-
-/* input — drag to look (mouse or right-half touch), left-half touch joystick */
-let lookDrag = null;
-const cnv = renderer.domElement;
-cnv.addEventListener('pointerdown', e => {
-  if (!walk.on) return;
-  if (e.pointerType === 'touch' && e.clientX < innerWidth * .45) {
-    walk.joyL = { id: e.pointerId, x0: e.clientX, y0: e.clientY }; joyShow(e.clientX, e.clientY);
-  } else lookDrag = { id: e.pointerId, x: e.clientX, y: e.clientY };
-});
-addEventListener('pointermove', e => {
-  if (!walk.on) return;
-  if (walk.joyL && e.pointerId === walk.joyL.id) {
-    const dx = e.clientX - walk.joyL.x0, dy = e.clientY - walk.joyL.y0;
-    const m = Math.min(1, Math.hypot(dx, dy) / 60);
-    const a = Math.atan2(dx, -dy);
-    walk.joyM = { f: -Math.cos(a) * m * -1, s: Math.sin(a) * m };  /* forward, strafe */
-    joyMove(dx, dy);
-  } else if (lookDrag && e.pointerId === lookDrag.id) {
-    walk.yaw -= (e.clientX - lookDrag.x) * .0042;
-    walk.pitch = Math.max(-1.2, Math.min(1.2, walk.pitch - (e.clientY - lookDrag.y) * .0035));
-    lookDrag.x = e.clientX; lookDrag.y = e.clientY;
-  }
-});
-addEventListener('pointerup', e => {
-  if (walk.joyL && e.pointerId === walk.joyL.id) { walk.joyL = null; walk.joyM = null; joyHide(); }
-  if (lookDrag && e.pointerId === lookDrag.id) lookDrag = null;
-});
-
-/* tiny visual joystick */
-let joyEl = null, joyKnob = null;
-function joyShow(x, y) {
-  if (!joyEl) {
-    joyEl = document.createElement('div'); joyKnob = document.createElement('div');
-    joyEl.style.cssText = 'position:fixed;width:96px;height:96px;border:2px solid rgba(216,220,230,.4);border-radius:50%;pointer-events:none;z-index:40;';
-    joyKnob.style.cssText = 'position:absolute;left:50%;top:50%;width:36px;height:36px;margin:-18px 0 0 -18px;border-radius:50%;background:rgba(127,224,178,.5);';
-    joyEl.appendChild(joyKnob); document.body.appendChild(joyEl);
-  }
-  joyEl.style.display = 'block';
-  joyEl.style.left = (x - 48) + 'px'; joyEl.style.top = (y - 48) + 'px';
-}
-function joyMove(dx, dy) {
-  if (!joyKnob) return;
-  const m = Math.min(40, Math.hypot(dx, dy)), a = Math.atan2(dy, dx);
-  joyKnob.style.transform = `translate(${Math.cos(a) * m}px, ${Math.sin(a) * m}px)`;
-}
-function joyHide() { if (joyEl) { joyEl.style.display = 'none'; joyKnob.style.transform = ''; } }
-
-let lastDistrict = '';
-function walkUpdate(dt) {
-  /* first frame after the entrance tween: seize the camera */
-  if (walk.pending) {
-    walk.pending = false; walk.on = true;
-    controls.enabled = false;
-    const e = new THREE.Euler().setFromQuaternion(camera.quaternion, 'YXZ');
-    walk.yaw = e.y; walk.pitch = e.x;
-    showDistrictLabel('Market Lane');
-  }
-  let f = 0, s = 0;
-  const k = walk.keys;
-  if (k['w'] || k['arrowup']) f += 1;
-  if (k['s'] || k['arrowdown']) f -= 1;
-  if (k['a'] || k['arrowleft']) s -= 1;
-  if (k['d'] || k['arrowright']) s += 1;
-  if (walk.joyM) { f += walk.joyM.f; s += walk.joyM.s; }
-  const spd = WALK_SPEED * (k['shift'] ? RUN_MULT : 1);
-  const sin = Math.sin(walk.yaw), cos = Math.cos(walk.yaw);
-  let nx = camera.position.x + (-sin * f + cos * s) * spd * dt;
-  let nz = camera.position.z + (-cos * f - sin * s) * spd * dt;
-  const cg = groundAt(camera.position.x, camera.position.z);
-  /* slide along obstacles: try full, then each axis */
-  if (!blockedAt(nx, nz, cg)) { camera.position.x = nx; camera.position.z = nz; }
-  else if (!blockedAt(nx, camera.position.z, cg)) camera.position.x = nx;
-  else if (!blockedAt(camera.position.x, nz, cg)) camera.position.z = nz;
-  const g = groundAt(camera.position.x, camera.position.z);
-  camera.position.y += ((g + EYE) - camera.position.y) * Math.min(1, dt * 10);
-  camera.quaternion.setFromEuler(new THREE.Euler(walk.pitch, walk.yaw, 0, 'YXZ'));
-  /* district HUD */
-  let name = '';
-  for (const d of districts) {
-    const dx = camera.position.x - d.x, dz = camera.position.z - d.z;
-    if (dx * dx + dz * dz < d.r * d.r * .55) { name = d.name; break; }
-  }
-  if (name && name !== lastDistrict) { lastDistrict = name; showDistrictLabel(name); }
-}
-
 /* ---------------- tour ---------------- */
 let tourIdx = -1, tourHold = 0, tween = null;
 function flyTo(d, hold = 7) {
@@ -1336,8 +1166,8 @@ function animate() {
     camera.position.lerpVectors(tween.fromP, tween.toP, s);
     if (u >= 1) tween = null;
   }
-  if ((walk.on || walk.pending) && !tween) walkUpdate(dt);
-  if (!walk.on) controls.update();
+  if ((window.__walk?.on || window.__walk?.pending) && !tween) walkUpdate(dt);
+  if (!window.__walk?.on) controls.update();
 
   /* births rise from the ward to the tree */
   for (let i = births.length - 1; i >= 0; i--) {
@@ -1375,6 +1205,128 @@ function animate() {
   renderer.render(scene, camera);
   requestAnimationFrame(animate);
 }
+/* ---------------- STREET LEVEL (Phase 1 — the Mayor's vision) ---------------- */
+const walk = { on:false, pending:false, yaw:0, pitch:0, keys:{}, joyM:null, joyL:null };
+window.__walk = walk;
+const EYE = 1.55, WALK_SPEED = 5.2, RUN_MULT = 1.8;
+let W_colliders=null, W_decks=null, W_water=null;
+const W_SPAWN = { x:21, z:26 };  /* Market Lane south row — where the shop will stand */
+
+function W_build(){
+  W_colliders=[]; W_decks=[]; W_water=[];
+  world.updateMatrixWorld(true);
+  world.traverse(m=>{
+    if(!m.isMesh||!m.geometry) return;
+    if(!(m.geometry.type||'').includes('Box')) return;
+    const b=new THREE.Box3().setFromObject(m), hgt=b.max.y-b.min.y;
+    if(waters.includes(m)){ W_water.push(b); return; }
+    if(hgt>=1.6) W_colliders.push(b);
+    else if(b.min.y>0.25 && hgt<1.2) W_decks.push(b);
+  });
+}
+function W_ground(x,z){
+  let g=terrainH(x,z);
+  if(W_decks) for(const d of W_decks)
+    if(x>d.min.x-.2&&x<d.max.x+.2&&z>d.min.z-.2&&z<d.max.z+.2) g=Math.max(g,d.max.y);
+  return g;
+}
+function W_blocked(x,z,g){
+  if(W_colliders) for(const b of W_colliders)
+    if(x>b.min.x-.35&&x<b.max.x+.35&&z>b.min.z-.35&&z<b.max.z+.35)
+      if(b.max.y-g>1.1 && b.min.y-g<1.3) return true;
+  if(W_water) for(const w of W_water)
+    if(x>w.min.x&&x<w.max.x&&z>w.min.z&&z<w.max.z){
+      let deck=false;
+      if(W_decks) for(const d of W_decks)
+        if(x>d.min.x-.2&&x<d.max.x+.2&&z>d.min.z-.2&&z<d.max.z+.2){deck=true;break;}
+      if(!deck && terrainH(x,z)<w.max.y+.1) return true;
+    }
+  return false;
+}
+function W_label(txt){
+  const el=document.getElementById('district'); if(!el) return;
+  el.textContent=txt; el.style.opacity=1;
+  clearTimeout(el._t); el._t=setTimeout(()=>el.style.opacity=0,6000);
+}
+function W_enter(){
+  if(!W_colliders) W_build();
+  state.tour=false; $('btnTour').textContent='Tour';
+  const gy=W_ground(W_SPAWN.x,W_SPAWN.z);
+  walk.pending=true;
+  tween={ t:0, dur:2.6,
+    fromT:controls.target.clone(), toT:new THREE.Vector3(W_SPAWN.x,gy+EYE-.1,W_SPAWN.z-4),
+    fromP:camera.position.clone(), toP:new THREE.Vector3(W_SPAWN.x,gy+EYE,W_SPAWN.z) };
+  $('btnWalk').textContent='↑ Overview';
+  W_label('Street Level — WASD / left thumb to walk · drag to look');
+}
+function W_exit(){
+  walk.on=false; walk.pending=false; W_joyHide(); controls.enabled=true;
+  tween={ t:0, dur:2.6,
+    fromT:controls.target.clone(), toT:new THREE.Vector3(0,0,2),
+    fromP:camera.position.clone(), toP:new THREE.Vector3(60,78,105) };
+  $('btnWalk').textContent='⟶ Walk';
+}
+$('btnWalk').onclick=()=> (walk.on||walk.pending)? W_exit(): W_enter();
+addEventListener('keydown',e=>{ if(e.key==='Escape'&&(walk.on||walk.pending))W_exit(); walk.keys[e.key.toLowerCase()]=true; });
+addEventListener('keyup',e=>walk.keys[e.key.toLowerCase()]=false);
+
+let W_look=null; const W_cnv=renderer.domElement;
+W_cnv.addEventListener('pointerdown',e=>{
+  if(!walk.on) return;
+  if(e.pointerType==='touch' && e.clientX<innerWidth*.45){ walk.joyL={id:e.pointerId,x0:e.clientX,y0:e.clientY}; W_joyShow(e.clientX,e.clientY); }
+  else W_look={id:e.pointerId,x:e.clientX,y:e.clientY};
+});
+addEventListener('pointermove',e=>{
+  if(!walk.on) return;
+  if(walk.joyL&&e.pointerId===walk.joyL.id){
+    const dx=e.clientX-walk.joyL.x0,dy=e.clientY-walk.joyL.y0,m=Math.min(1,Math.hypot(dx,dy)/60),a=Math.atan2(dx,-dy);
+    walk.joyM={ f:Math.cos(a)*m, s:Math.sin(a)*m }; W_joyMove(dx,dy);
+  } else if(W_look&&e.pointerId===W_look.id){
+    walk.yaw-=(e.clientX-W_look.x)*.0042;
+    walk.pitch=Math.max(-1.2,Math.min(1.2,walk.pitch-(e.clientY-W_look.y)*.0035));
+    W_look.x=e.clientX; W_look.y=e.clientY;
+  }
+});
+addEventListener('pointerup',e=>{
+  if(walk.joyL&&e.pointerId===walk.joyL.id){ walk.joyL=null; walk.joyM=null; W_joyHide(); }
+  if(W_look&&e.pointerId===W_look.id) W_look=null;
+});
+let W_joyEl=null,W_joyKnob=null;
+function W_joyShow(x,y){
+  if(!W_joyEl){ W_joyEl=document.createElement('div'); W_joyKnob=document.createElement('div');
+    W_joyEl.style.cssText='position:fixed;width:96px;height:96px;border:2px solid rgba(216,220,230,.4);border-radius:50%;pointer-events:none;z-index:40;';
+    W_joyKnob.style.cssText='position:absolute;left:50%;top:50%;width:36px;height:36px;margin:-18px 0 0 -18px;border-radius:50%;background:rgba(127,224,178,.5);';
+    W_joyEl.appendChild(W_joyKnob); document.body.appendChild(W_joyEl); }
+  W_joyEl.style.display='block'; W_joyEl.style.left=(x-48)+'px'; W_joyEl.style.top=(y-48)+'px';
+}
+function W_joyMove(dx,dy){ if(!W_joyKnob)return; const m=Math.min(40,Math.hypot(dx,dy)),a=Math.atan2(dy,dx); W_joyKnob.style.transform=`translate(${Math.cos(a)*m}px,${Math.sin(a)*m}px)`; }
+function W_joyHide(){ if(W_joyEl){ W_joyEl.style.display='none'; W_joyKnob.style.transform=''; } }
+
+let W_lastD='';
+function walkUpdate(dt){
+  if(walk.pending){
+    walk.pending=false; walk.on=true; controls.enabled=false;
+    const e=new THREE.Euler().setFromQuaternion(camera.quaternion,'YXZ'); walk.yaw=e.y; walk.pitch=e.x;
+    W_label('Market Lane');
+  }
+  let f=0,s=0; const k=walk.keys;
+  if(k['w']||k['arrowup'])f+=1; if(k['s']||k['arrowdown'])f-=1;
+  if(k['a']||k['arrowleft'])s-=1; if(k['d']||k['arrowright'])s+=1;
+  if(walk.joyM){ f+=walk.joyM.f; s+=walk.joyM.s; }
+  const spd=WALK_SPEED*(k['shift']?RUN_MULT:1), sin=Math.sin(walk.yaw), cos=Math.cos(walk.yaw);
+  const nx=camera.position.x+(-sin*f+cos*s)*spd*dt, nz=camera.position.z+(-cos*f-sin*s)*spd*dt;
+  const cg=W_ground(camera.position.x,camera.position.z);
+  if(!W_blocked(nx,nz,cg)){ camera.position.x=nx; camera.position.z=nz; }
+  else if(!W_blocked(nx,camera.position.z,cg)) camera.position.x=nx;
+  else if(!W_blocked(camera.position.x,nz,cg)) camera.position.z=nz;
+  const g=W_ground(camera.position.x,camera.position.z);
+  camera.position.y+=((g+EYE)-camera.position.y)*Math.min(1,dt*10);
+  camera.quaternion.setFromEuler(new THREE.Euler(walk.pitch,walk.yaw,0,'YXZ'));
+  let name='';
+  for(const d of districts){ const dx=camera.position.x-d.x,dz=camera.position.z-d.z; if(dx*dx+dz*dz<d.r*d.r*.55){ name=d.name; break; } }
+  if(name&&name!==W_lastD){ W_lastD=name; W_label(name); }
+}
+
 animate();
 </script>
 <script>
